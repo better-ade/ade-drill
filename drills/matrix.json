@@ -1,0 +1,19 @@
+{
+  "about": "One entry per nightly suite: the repo at main, the runner, its verification command, and optional setup.",
+  "suites": [
+    { "repo": "ade-method",         "os": "ubuntu-latest", "command": "node scripts/validate.mjs" },
+    { "repo": "ade-agent-registry", "os": "ubuntu-latest", "command": "node scripts/validate.mjs" },
+    { "repo": "ade-cli",            "os": "ubuntu-latest", "command": "bash tests/run.sh" },
+    { "repo": "ade-cli",            "os": "macos-latest",  "command": "bash tests/run.sh" },
+    { "repo": "ade-secrets",        "os": "ubuntu-latest", "command": "bash tests/run.sh" },
+    { "repo": "ade-secrets",        "os": "macos-latest",  "command": "bash tests/run.sh" },
+    { "repo": "ade-brain",          "os": "macos-latest",  "command": "bash tests/run.sh" },
+    { "repo": "ade-skills",         "os": "ubuntu-latest", "command": "bash tests/run.sh",
+      "setup": "npm install -g @anthropic-ai/claude-code@2.1.330 && curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar xz gitleaks && sudo mv gitleaks /usr/local/bin/" }
+  ],
+  "drills": [
+    { "name": "pins",    "os": "ubuntu-latest" },
+    { "name": "project", "os": "ubuntu-latest" },
+    { "name": "project", "os": "macos-latest" }
+  ]
+}

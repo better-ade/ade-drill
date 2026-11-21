@@ -1,0 +1,70 @@
+name: nightly
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: nightly, cancel-in-progress: false }
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      suites: ${{ steps.m.outputs.suites }}
+      drills: ${{ steps.m.outputs.drills }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: m
+        run: |
+          python3 -c 'import json; m=json.load(open("drills/matrix.json")); print("suites="+json.dumps(m["suites"])); print("drills="+json.dumps(m["drills"]))' >> "$GITHUB_OUTPUT"
+  suite:
+    needs: plan
+    name: suite ${{ matrix.repo }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.suites) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { repository: "better-ade/${{ matrix.repo }}", fetch-depth: 0 }
+      - name: setup
+        if: matrix.setup
+        run: ${{ matrix.setup }}
+      - name: verification command
+        run: ${{ matrix.command }}
+  drill:
+    needs: plan
+    name: drill ${{ matrix.name }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.drills) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: bash drills/run.sh ${{ matrix.name }}
+        env: { GITHUB_TOKEN: "${{ github.token }}" }
+  report:
+    needs: [suite, drill]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: { issues: write, contents: read }
+    steps:
+      - name: open, update or close the nightly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ (needs.suite.result == 'success' && needs.drill.result == 'success') && 'green' || 'red' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          open=$(gh issue list -R "$GITHUB_REPOSITORY" --label nightly --state open --json number --jq '.[0].number')
+          day=$(date -u +%F)
+          if [ "$RESULT" = red ]; then
+            body="The nightly drill failed on $day: $RUN_URL"
+            if [ -n "$open" ]; then gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$body"
+            else gh issue create -R "$GITHUB_REPOSITORY" --title "Nightly drill is failing" --label nightly --body "$body"; fi
+          elif [ -n "$open" ]; then
+            gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "Green again on $day: $RUN_URL"
+            gh issue close "$open" -R "$GITHUB_REPOSITORY"
+          fi
