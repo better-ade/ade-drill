@@ -1,0 +1,2 @@
+All set: your hub drill-hub is ready (~/hubs/drill-hub).
+next: type ade to open your workspace (your main agent, and a tab per agent)

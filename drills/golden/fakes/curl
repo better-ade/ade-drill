@@ -1,0 +1,13 @@
+#!/bin/bash
+# A stand-in in front of curl: the two addresses that belong to an account or a service the drill fakes go to the
+# stand-ins; every other request is the real curl, unchanged (the release download of ade is real).
+#   https://claude.ai/install.sh    the stand-in installer of Claude Code ($DRILL_CLAUDE_INSTALLER)
+#   https://api.telegram.org/...    in a `-K -` config on stdin, as the hub's bin/chat test writes it: the stand-in
+#                                   Bot API ($AGENT_TELEGRAM_API, always http://127.0.0.1:<port>)
+set -u; real="${DRILL_REAL_CURL:?curl stand-in: DRILL_REAL_CURL is not set}"; k=0; prev=""
+for a in "$@"; do
+  case "$a" in https://claude.ai/install.sh) exec cat "${DRILL_CLAUDE_INSTALLER:?}" ;; esac
+  [ "$prev" = -K ] && [ "$a" = - ] && k=1; prev="$a"
+done
+[ "$k" = 1 ] || exec "$real" "$@"
+sed "s#https://api\.telegram\.org#${AGENT_TELEGRAM_API:?curl stand-in: AGENT_TELEGRAM_API is not set}#" | "$real" "$@"

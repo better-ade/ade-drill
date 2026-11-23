@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""A stand-in for Claude Code, its sign-in, the Telegram channel plugin and the model, for the golden-path drill.
+
+It never reaches Anthropic or Telegram. What it reads: ~/.fake-claude.json (written by the drill into the drill's own
+home folder): {"state": <folder>, "model": <folder of the scripted model>, "api": "http://127.0.0.1:<port>"}.
+Every call is appended to <state>/claude.log (the arguments and the folder it ran in).
+
+  claude --version | update | plugin ...        Claude Code's own commands, as far as ade and the hub call them
+  claude auth status | auth login               signed in once `auth login` ran (a marker file; no account, no browser)
+  claude -p ... (a task on stdin)               the model: a task that asks for READY gets READY (ade's live test)
+  claude --channels plugin:telegram@... ...     the hub's main agent with the Telegram plugin attached (see chat())
+  claude ... -- <prompt>                        a session: the guide's own prompt ends at once; any other prompt is a
+                                                focus agent, which runs the scripted model (model/builder.sh) in the
+                                                folder it was started in and then stays open, idle, as a session does
+"""
+import json, os, re, secrets, select, subprocess, sys, time, urllib.error, urllib.request
+
+HOME = os.path.expanduser("~")
+try: CONF = json.load(open(os.path.join(HOME, ".fake-claude.json")))
+except (OSError, ValueError): CONF = {}
+STATE = CONF.get("state") or os.path.join(HOME, ".fake-claude")
+MODEL = CONF.get("model", "")
+API = CONF.get("api", "")
+os.makedirs(STATE, exist_ok=True)
+ARGS = sys.argv[1:]
+CFG = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(HOME, ".claude")
+
+
+def log(line):
+    with open(os.path.join(STATE, "claude.log"), "a") as f: f.write(line.rstrip("\n") + "\n")
+
+
+def say(text):
+    sys.stdout.write(text + "\r\n" if sys.stdout.isatty() else text + "\n"); sys.stdout.flush()
+
+
+def value(flag):
+    return ARGS[ARGS.index(flag) + 1] if flag in ARGS and ARGS.index(flag) + 1 < len(ARGS) else ""
+
+
+def agent_env():
+    """what a command run by the model sees: it is inside a Claude Code session"""
+    e = dict(os.environ); e["CLAUDECODE"] = "1"; e["DRILL_STATE"] = STATE; e["DRILL_MODEL"] = MODEL
+    return e
+
+
+def plugin(argv):
+    path = os.path.join(CFG, "plugins", "installed_plugins.json")
+    try: d = json.load(open(path))
+    except (OSError, ValueError): d = {"version": 2, "plugins": {}}
+    if argv[:1] == ["install"] and len(argv) > 1:
+        scope = argv[argv.index("--scope") + 1] if "--scope" in argv else "user"
+        d["plugins"][argv[1]] = [{"scope": scope, "version": "0.0.0-drill"}]
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f: json.dump(d, f)
+        say("installed %s (a stand-in: the drill has no plugin code)" % argv[1])
+    elif argv[:1] == ["list"]:
+        for k, v in d["plugins"].items(): say("%s %s" % (k, v[0].get("version")))
+    return 0
+
+
+# ---- the Telegram plugin's side, as the real plugin behaves (its state folder, its access.json, the Bot API) ----
+def api(token, method, params, timeout=10):
+    req = urllib.request.Request("%s/bot%s/%s" % (API, token, method), data=json.dumps(params).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r: return json.load(r)
+    except (urllib.error.URLError, OSError, ValueError): return {"ok": False}
+
+
+def access_load(path):
+    try: a = json.load(open(path))
+    except (OSError, ValueError): a = {}
+    a.setdefault("dmPolicy", "pairing"); a.setdefault("allowFrom", []); a.setdefault("groups", {}); a.setdefault("pending", {})
+    return a
+
+
+def access_save(path, a):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f: json.dump(a, f, indent=2)
+    os.replace(tmp, path)
+
+
+def chat():
+    """The main agent's session with the Telegram plugin attached, as bin/chat start runs it. The plugin: reads the
+    bot token from <state folder>/.env, writes bot.pid, long-polls getUpdates, answers a stranger with a pairing code
+    while the policy is pairing, and hands a message from an account on the allowlist to the model. The session: takes
+    /telegram:access pair <code>, /telegram:access policy <name> and /exit typed at its terminal. The model
+    (model/orchestrator.sh, the message in a file) answers through the plugin's reply tool: each line it prints that
+    starts with "REPLY: " goes to the chat."""
+    d = os.environ.get("TELEGRAM_STATE_DIR", "")
+    if not d or not os.path.isdir(d): say("telegram: no state folder (TELEGRAM_STATE_DIR)"); return 1
+    token = ""
+    try:
+        for line in open(os.path.join(d, ".env")):
+            if line.startswith("TELEGRAM_BOT_TOKEN="): token = line.split("=", 1)[1].strip()
+    except OSError: pass
+    if not token: say("telegram: no bot token in the state folder"); return 1
+    acc = os.path.join(d, "access.json")
+    with open(os.path.join(d, "bot.pid"), "w") as f: f.write(str(os.getpid()))
+    mode = value("--permission-mode")
+    say("Claude Code (stand-in) with the Telegram plugin; permission mode: %s" % mode)
+    offset = 0; tty = sys.stdin.isatty(); buf = b""
+    while True:
+        if tty:   # what the person types in this session
+            r, _, _ = select.select([sys.stdin.fileno()], [], [], 0.2)
+            if r:
+                got = os.read(sys.stdin.fileno(), 4096)
+                if not got: return 0
+                buf += got
+                while b"\n" in buf or b"\r" in buf:
+                    line, buf = re.split(rb"[\r\n]", buf, maxsplit=1)
+                    line = line.decode("utf-8", "replace").strip()
+                    if line == "/exit": say("bye"); return 0
+                    m = re.fullmatch(r"/telegram:access pair ([a-z0-9]{4,12})", line)
+                    if m:
+                        a = access_load(acc); p = a["pending"].pop(m.group(1), None)
+                        if not p: say("no pending pairing with that code"); continue
+                        if p["senderId"] not in a["allowFrom"]: a["allowFrom"].append(p["senderId"])
+                        access_save(acc, a); api(token, "sendMessage", {"chat_id": p["chatId"], "text": "Paired! Say hi to Claude."})
+                        say("paired"); continue
+                    m = re.fullmatch(r"/telegram:access policy (pairing|allowlist|disabled)", line)
+                    if m:
+                        a = access_load(acc); a["dmPolicy"] = m.group(1); access_save(acc, a); say("policy: " + m.group(1))
+        else: time.sleep(0.2)
+        res = api(token, "getUpdates", {"offset": offset, "timeout": 1})
+        for u in res.get("result") or []:
+            offset = max(offset, u.get("update_id", 0) + 1)
+            msg = u.get("message") or {}; sender = str((msg.get("from") or {}).get("id", "")); chat_id = str((msg.get("chat") or {}).get("id", ""))
+            text = msg.get("text") or ""
+            a = access_load(acc)
+            if sender in a["allowFrom"]:
+                log("channel message from the paired owner, mode %s: %s" % (mode, text))
+                if mode != "auto":   # outside auto mode the model's commands wait for an Allow at the terminal
+                    log("held: the session is not in auto mode"); continue
+                n = os.path.join(STATE, "message-%d.txt" % u.get("update_id", 0))
+                with open(n, "w") as f: f.write(text + "\n")
+                p = subprocess.Popen(["bash", os.path.join(MODEL, "orchestrator.sh"), n], cwd=os.getcwd(), env=agent_env(),
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in p.stdout:
+                    log("orchestrator: " + line.rstrip("\n"))
+                    if line.startswith("REPLY: "): api(token, "sendMessage", {"chat_id": chat_id, "text": line[7:].rstrip("\n")})
+                p.wait()
+            elif a["dmPolicy"] == "pairing":
+                code = secrets.token_hex(3)
+                a["pending"][code] = {"senderId": sender, "chatId": chat_id, "createdAt": int(time.time() * 1000)}
+                access_save(acc, a)
+                api(token, "sendMessage", {"chat_id": chat_id, "text": "Pairing required — run in Claude Code:\n\n/telegram:access pair %s" % code})
+            else: log("dropped: a message from an account that is not on the allowlist")
+
+
+def main():
+    log("%s :: %s" % (os.getcwd(), " ".join(ARGS)))
+    signed = os.path.join(STATE, "claude-signed-in")
+    if ARGS[:1] == ["--version"] or ARGS[:1] == ["-v"]: say("0.0.0 (Claude Code stand-in, ade-drill)"); return 0
+    if ARGS[:1] == ["update"]: return 0
+    if ARGS[:2] == ["auth", "status"]: return 0 if os.path.exists(signed) else 1
+    if ARGS[:2] == ["auth", "login"]:
+        say("Opening your browser to sign in (stand-in: no browser, no account)...")
+        open(signed, "w").close()
+        with open(os.path.join(HOME, ".claude.json"), "w") as f:
+            json.dump({"oauthAccount": {"accountUuid": "00000000-0000-4000-8000-00000000d001", "organizationUuid": "00000000-0000-4000-8000-00000000d002"}}, f)
+        say("Login successful."); return 0
+    if ARGS[:1] == ["plugin"]: return plugin(ARGS[1:])
+    if "-p" in ARGS or "--print" in ARGS:
+        task = " ".join(ARGS) + ("" if sys.stdin.isatty() else sys.stdin.read())
+        if not os.path.exists(signed): sys.stderr.write("Not logged in · Please run /login\n"); return 1
+        say("READY" if "READY" in task else "ok"); return 0
+    if "--channels" in ARGS: return chat()
+    prompt = ARGS[ARGS.index("--") + 1] if "--" in ARGS and ARGS.index("--") + 1 < len(ARGS) else ""
+    if not prompt and ARGS and ARGS[-1].startswith("Run the ADE setup guide"): prompt = ARGS[-1]
+    if prompt.startswith("Run the ADE setup guide"):
+        say("Claude Code (stand-in): the guided session. A person talks with the model here; the drill has neither, so it ends.")
+        return 0
+    say("Claude Code (stand-in): a session in %s" % os.getcwd())
+    if prompt and MODEL:
+        say("> " + prompt)
+        with open(os.path.join(STATE, "focus-prompt.txt"), "w") as f: f.write(prompt + "\n")
+        p = subprocess.Popen(["bash", os.path.join(MODEL, "builder.sh")], cwd=os.getcwd(), env=agent_env(),
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for line in p.stdout: say(line.rstrip("\n"))
+        p.wait()
+    # a session stays open, idle, until it is closed
+    try:
+        while True:
+            if sys.stdin.isatty():
+                got = os.read(sys.stdin.fileno(), 4096)
+                if not got or b"/exit" in got: return 0
+            else: time.sleep(1)
+    except (OSError, KeyboardInterrupt): return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

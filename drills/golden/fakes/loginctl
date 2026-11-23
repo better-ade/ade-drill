@@ -1,0 +1,3 @@
+#!/bin/bash
+# A stand-in: lingering is a setting of the real machine; the drill changes none.
+exit 0

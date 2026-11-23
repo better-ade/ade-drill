@@ -1,0 +1,17 @@
+# The person at the terminal of `ade setup`, on a machine with nothing set up. Each line: the text to wait for, a tab,
+# then what to type (see guide() in run.py for the @ words). Order matters: each line is waited for after the one before.
+?This runs: sudo apt-get install	n
+?Install it now?	y
+How do you use Claude?	account
+Press Enter to open github.com	@enter
+Name for your hub	@hub
+Kind of teammate	1
+Who this hub works for	Drill
+Owner (your name	Drill Owner
+Pick one	claude-account
+Pick any	anthropic
+Do you want to reach your main agent from Telegram?	y
+Bot token (hidden	@token
+Press Enter when done	@second-terminal	@enter
+Press Enter when done	@message-the-bot	@enter
+Press Enter when done	@lock	@enter

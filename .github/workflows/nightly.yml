@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: "17 8 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [ade-cli-release]   # sent by ade-cli's release workflow, so a new release is drilled at once
 permissions: { contents: read }
 concurrency: { group: nightly, cancel-in-progress: false }
 jobs:
@@ -35,7 +37,7 @@ jobs:
         run: ${{ matrix.command }}
   drill:
     needs: plan
-    name: drill ${{ matrix.name }} (${{ matrix.os }})
+    name: drill ${{ matrix.name }} (${{ matrix.os }}${{ matrix.ade && format(', ade {0}', matrix.ade) || '' }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -44,8 +46,21 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.drills) }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: setup
+        if: matrix.setup
+        run: ${{ matrix.setup }}
       - run: bash drills/run.sh ${{ matrix.name }}
-        env: { GITHUB_TOKEN: "${{ github.token }}" }
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GOLDEN_ADE_REF: ${{ matrix.ade }}
+          GOLDEN_OUT: ${{ runner.temp }}/golden
+      - name: the golden path's transcripts and first-run report
+        if: always() && matrix.name == 'golden'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: golden-${{ matrix.os }}-${{ matrix.ade || 'release' }}
+          path: ${{ runner.temp }}/golden
+          if-no-files-found: warn
   report:
     needs: [suite, drill]
     if: always()

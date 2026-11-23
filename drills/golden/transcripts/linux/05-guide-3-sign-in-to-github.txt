@@ -1,0 +1,10 @@
+Step 3 of 6: Sign in to GitHub
+Your hub needs GitHub: it is a private repository on your GitHub account,
+which keeps the hub's memory and lets you restore the hub on another computer.
+This runs GitHub's own sign-in (gh auth login --web): it shows a one-time code
+to type at github.com/login/device, on this machine or any other device.
+ade never asks for a password or a token, and never sees one.
+! First copy your one-time code: DR1L-G0LD
+Press Enter to open github.com in your browser...
+Logged in as drill-owner (stand-in: no account, no browser)
+checked: signed in to GitHub as drill-owner

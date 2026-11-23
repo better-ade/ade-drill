@@ -1,0 +1,11 @@
+Welcome to your ADE Computer. The set-up guide (ade setup), 6 steps:
+  [x] 1. Claude Code            installed
+  [ ] 2. Sign in to Claude      not signed in
+  [ ] 3. Sign in to GitHub      not signed in
+  [ ] 4. Your hub               none yet
+  [ ] 5. Your first project     none yet
+  [ ] 6. Telegram (optional)    off
+The viewer extras (ade files and ade view work without them): yazi glow
+  ade files uses yazi only with ADE_FILES=yazi: yazi is neither read-only nor held to the hub and its projects: it can delete, rename, move and run commands, and walks anywhere without asking.
+yazi: not in apt; get it from https://github.com/sxyazi/yazi/releases (ade works without it)
+glow: not in apt; get it from https://github.com/charmbracelet/glow/releases (ade works without it)

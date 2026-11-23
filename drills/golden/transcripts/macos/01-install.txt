@@ -1,0 +1,2 @@
+installed ade <version> to /Users/you/.local/bin/ade
+tools: everything ade uses is installed

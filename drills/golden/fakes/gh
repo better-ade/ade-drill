@@ -1,0 +1,34 @@
+#!/bin/bash
+# A stand-in for the GitHub CLI and for GitHub itself: no account, no network. State: $DRILL_GH (a folder).
+#   gh auth status            signed in once `gh auth login` ran (a marker file)
+#   gh auth login ...         shows a one-time code as gh does, waits for Enter, then counts as signed in
+#   gh api user --jq .login   the stand-in account name
+#   gh repo create <name> --template <owner/repo> --private|--public --clone
+#                             "GitHub" is a bare repository, $DRILL_GH/github/<account>/<name>.git, made from the
+#                             template the drill cloned ($DRILL_TEMPLATE) as one first commit, then cloned here
+# Anything else is refused and logged, so a call the drill does not know never passes silently.
+set -u; G="${DRILL_GH:?gh stand-in: DRILL_GH is not set}"; mkdir -p "$G"; ME=drill-owner
+printf '%s\n' "$*" >> "$G/gh.log"
+case "${1:-} ${2:-}" in
+  "auth status") [ -f "$G/signed-in" ] ;;
+  "auth login") echo "! First copy your one-time code: DR1L-G0LD"
+    printf 'Press Enter to open github.com in your browser... '; read -r _ || exit 1
+    : > "$G/signed-in"; echo "Logged in as $ME (stand-in: no account, no browser)" ;;
+  "api user") [ -f "$G/signed-in" ] || exit 1; echo "$ME" ;;
+  "repo create") [ -f "$G/signed-in" ] || { echo "To get started with GitHub CLI, please run:  gh auth login" >&2; exit 4; }
+    name="$3"; vis=""; tpl=""; clone=0; shift 3
+    while [ $# -gt 0 ]; do case "$1" in --template) tpl="$2"; shift 2 ;; --private|--public) vis="$1"; shift ;; --clone) clone=1; shift ;;
+      *) echo "gh stand-in: unknown flag $1" >&2; exit 1 ;; esac; done
+    [ "$tpl" = better-ade/ade-brain ] || { echo "gh stand-in: unknown template $tpl" >&2; exit 1; }
+    bare="$G/github/$ME/$name.git"
+    [ ! -e "$bare" ] || { echo "GraphQL: Name already exists on this account (createRepository)" >&2; exit 1; }
+    mkdir -p "$(dirname "$bare")" && git init -q --bare -b main "$bare" || exit 1; echo "$vis" > "$bare/visibility"
+    # as GitHub makes a repository from a template: the template's files, one first commit, none of its history
+    tmp="$G/template-copy-$name"; mkdir "$tmp" && git -C "$DRILL_TEMPLATE" archive HEAD | tar -x -C "$tmp" || exit 1
+    ( cd "$tmp" && git init -q -b main . && git add -A &&
+      git -c user.name="$ME" -c user.email="$ME@example.invalid" -c core.hooksPath=/dev/null commit -q -m "Initial commit" &&
+      git push -q "$bare" main ) || exit 1
+    echo "https://github.com/$ME/$name"
+    [ "$clone" = 0 ] || git clone -q "$bare" "$name" ;;
+  *) echo "gh stand-in: not a call the drill knows: $*" >&2; exit 1 ;;
+esac

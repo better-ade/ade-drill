@@ -1,0 +1,40 @@
+Step 6 of 6: Telegram (optional)
+Optional: a Telegram bot of your own lets you reach your main agent. A yes asks
+for the bot's token (hidden), then goes one step at a time; no skips it.
+Do you want to reach your main agent from Telegram? [y/N] y
+In Telegram, open @BotFather and send /newbot, then give your bot a name.
+BotFather replies with the bot's token. Paste it here; it is not shown, and it
+goes only to the hub's key store.
+Bot token (hidden; Enter skips):
+checked: the token is in the hub's key store
+Next: the Telegram plugin for Claude Code, installed for your user.
+checked: the Telegram plugin is installed
+Your turn: open a second terminal window (keep this one open) and type:
+  cd ~/hubs/drill-hub && bin/chat start
+Claude Code opens there with your bot attached. Leave it open.
+Press Enter when done (or type later):
+checked: the session is running, with your bot connected
+Your turn: in Telegram, send your bot any message. It replies with a pairing
+code. In the Claude Code window you opened, type (with your code):
+  /telegram:access pair <code>
+Press Enter when done (or type later):
+checked: your Telegram account is paired
+Your turn: in the same Claude Code window, type:
+  /telegram:access policy allowlist
+After this, only your Telegram account reaches your main agent.
+Once it is locked, the chat runs in auto mode: your main agent acts on your
+Telegram messages without asking at the terminal. Claude Code's auto mode still
+refuses risky actions. To turn it off: HUB_CHAT_MODE=manual in hub.conf.
+Press Enter when done (or type later):
+checked: only your account reaches the bot
+Next: closing the session in your other window, so the hub can test the bot.
+Next: the test. Your bot sends you a message in Telegram: reply to it with
+anything. The hub waits for your reply (up to two minutes).
+checked: your bot's message reached you, and your reply reached the hub
+Next: your hub keeps the session with your bot running, in the background.
+checked: the session is running in the background
+The chat now runs in auto mode: your main agent acts on your Telegram
+messages without asking at the terminal. Claude Code's auto mode still refuses
+risky actions. To turn it off: HUB_CHAT_MODE=manual in hub.conf.
+Telegram is working: your bot passed its test, and its session is running.
+checked: Telegram is on

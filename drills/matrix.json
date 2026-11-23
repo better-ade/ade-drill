@@ -14,6 +14,9 @@
   "drills": [
     { "name": "pins",    "os": "ubuntu-latest" },
     { "name": "project", "os": "ubuntu-latest" },
-    { "name": "project", "os": "macos-latest" }
+    { "name": "project", "os": "macos-latest" },
+    { "name": "golden",  "os": "ubuntu-latest", "setup": "bash drills/golden/ci-tools.sh" },
+    { "name": "golden",  "os": "macos-latest",  "setup": "bash drills/golden/ci-tools.sh" },
+    { "name": "golden",  "os": "ubuntu-latest", "ade": "main", "setup": "bash drills/golden/ci-tools.sh chromium" }
   ]
 }

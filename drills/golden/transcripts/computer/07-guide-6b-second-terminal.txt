@@ -1,0 +1,10 @@
+nothing to recover
+chat: manual mode: the bot is not locked to you yet; in the session: /telegram:access policy allowlist
+chat: drill-hub on telegram (pid <pid>, mode manual)
+Claude Code (stand-in) with the Telegram plugin; permission mode: manual
+
+/telegram:access pair <code>
+paired
+
+/telegram:access policy allowlist
+policy: allowlist

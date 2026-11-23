@@ -1,0 +1,14 @@
+ADE set-up guide (ade setup): 6 steps from nothing to a working hub
+  [ ] 1. Claude Code            not installed
+  [ ] 2. Sign in to Claude      not signed in
+  [ ] 3. Sign in to GitHub      not signed in
+  [ ] 4. Your hub               none yet
+  [ ] 5. Your first project     none yet
+  [ ] 6. Telegram (optional)    off
+The viewer extras (ade files and ade view work without them): yazi bat glow poppler chafa code
+  ade files uses yazi only with ADE_FILES=yazi: yazi is neither read-only nor held to the hub and its projects: it can delete, rename, move and run commands, and walks anywhere without asking.
+yazi: not in apt; get it from https://github.com/sxyazi/yazi/releases (ade works without it)
+glow: not in apt; get it from https://github.com/charmbracelet/glow/releases (ade works without it)
+code: Visual Studio Code is not in apt; get it from https://code.visualstudio.com/download (ade adds no repository; ade works without it)
+Install bat poppler-utils chafa now? This runs: sudo apt-get install -y bat poppler-utils chafa [y/N] n
+nothing installed (later: ade setup --tools)
