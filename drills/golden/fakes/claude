@@ -106,8 +106,9 @@ def chat():
         if tty:   # what the person types in this session
             r, _, _ = select.select([sys.stdin.fileno()], [], [], 0.2)
             if r:
-                got = os.read(sys.stdin.fileno(), 4096)
-                if not got: return 0
+                try: got = os.read(sys.stdin.fileno(), 4096)
+                except OSError as e: log("the session's terminal is gone (%s)" % e); return 0
+                if not got: log("the session's input ended"); return 0
                 buf += got
                 while b"\n" in buf or b"\r" in buf:
                     line, buf = re.split(rb"[\r\n]", buf, maxsplit=1)
@@ -192,4 +193,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try: rc = main()
+    except BaseException as e:   # a stand-in that dies says why, in its log
+        if not isinstance(e, SystemExit): log("the stand-in stopped: %s: %s" % (e.__class__.__name__, e))
+        raise
+    sys.exit(rc)
