@@ -457,6 +457,21 @@ class Drill:
             out.append((n, text, sec))
         return out
 
+    def debug(self):
+        """after a failure: the stand-ins' logs and the hub's own, beside the report (none holds the bot token)"""
+        d = os.path.join(OUT, "debug"); shutil.rmtree(d, ignore_errors=True); os.makedirs(d)
+        logs = [os.path.join(self.state, "claude.log"), os.path.join(self.tg, "sent.jsonl"), os.path.join(self.tg, "errors.log"), os.path.join(self.env["DRILL_GH"], "gh.log")]
+        for root in (self.env["DRILL_SYSTEMD"], os.path.join(self.home, ".agent-hub", HUB, "logs"), os.path.join(self.home, ".config", "ade")):
+            if os.path.isdir(root): logs += [os.path.join(root, n) for n in os.listdir(root) if n.endswith(".log") or n == "last-failure"]
+        for f in logs:
+            try:
+                raw = open(f, "rb").read()
+                if TOKEN.encode() not in raw:
+                    with open(os.path.join(d, os.path.basename(f)), "wb") as g: g.write(raw)
+            except OSError: pass
+        ps = subprocess.run(["ps", "-eo", "pid,ppid,stat,args"], stdout=subprocess.PIPE).stdout.decode("utf-8", "replace")
+        with open(os.path.join(d, "processes.txt"), "w") as g: g.write("\n".join(l for l in ps.split("\n") if "claude" in l or "bin/chat" in l or "script" in l))
+
     def cleanup(self):
         for t in self.terms: t.close()
         if os.path.isdir(os.path.join(self.home, "hubs", HUB)):
@@ -539,6 +554,9 @@ def main():
     except Failed as e:
         failed = True; line("FAIL", "the drill's own set-up", str(e))
     finally:
+        if d and failed:
+            try: d.debug()
+            except (OSError, KeyError, subprocess.SubprocessError): pass
         if d: d.cleanup()
     ver = getattr(d, "ade_version", "ade not installed") if d else "ade not installed"
     if ADE_REF: ver += " from " + ADE_REF
