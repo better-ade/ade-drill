@@ -19,8 +19,9 @@ case "$verb" in
     : > "$flag"; case "$unit" in *.timer) exit 0 ;; esac; alive && exit 0
     cmd="$(sed -n 's/^ExecStart=//p' "$U/$unit" | head -1)"; wd="$(sed -n 's/^WorkingDirectory=//p' "$U/$unit" | head -1)"
     upath="$(sed -n 's/^Environment="PATH=\(.*\)"$/\1/p' "$U/$unit" | head -1)"
-    # every stream of the service goes to its log, so nothing of it holds the caller's output open
-    ( cd "$wd" && PATH="${DRILL_FAKES:?}:${upath:+$upath:}$PATH" TERM=xterm-256color exec nohup bash -c "exec $cmd" ) \
+    # as systemd starts a service: in a session of its own, with no terminal (the caller's terminal closing must not
+    # end it), every stream to its log (so nothing of it holds the caller's output open)
+    ( cd "$wd" && PATH="${DRILL_FAKES:?}:${upath:+$upath:}$PATH" TERM=xterm-256color exec nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' bash -c "exec $cmd" ) \
       < /dev/null >> "$S/unit-$unit.log" 2>&1 &
     echo $! > "$pidfile"
     exit 0 ;;
