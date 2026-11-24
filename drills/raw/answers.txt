@@ -18,6 +18,7 @@ Owner \(your name	Drill Owner
 Your name, for git commits	Drill Owner
 Your email, for git commits	drill@example.invalid
 ^Pick one	claude-account
+Which tools do you use for this work\?	@enter
 ^Pick any	anthropic
 Do you want to reach your main agent from Telegram\?	y
 Bot token \(hidden	@token
