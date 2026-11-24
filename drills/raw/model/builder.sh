@@ -39,9 +39,11 @@ kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
 exit "$ok"
 SH
     text="architect: note and verification command written (bash tests/verify.sh)" ;;
-  frontend) printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Website</title></head>\n<body><h1>Hello</h1></body></html>\n' > index.html
+  frontend) sleep 2   # the scripted work takes a moment, as a session's does: frontend and backend can overlap
+    printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Website</title></head>\n<body><h1>Hello</h1></body></html>\n' > index.html
     text="frontend: index.html written" ;;
-  backend) cat > server.js <<'JS'
+  backend) sleep 2
+    cat > server.js <<'JS'
 const port = Number(process.env.PORT || 3000);
 Bun.serve({ port, hostname: "127.0.0.1", fetch(req) {
   const path = new URL(req.url).pathname;

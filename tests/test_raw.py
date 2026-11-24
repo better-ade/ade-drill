@@ -182,6 +182,8 @@ class Report(unittest.TestCase):
                      "| guide | Press Enter when done | @enter | yes: terminal-only after Telegram |", "| install | `/usr/bin/apt-get install -y curl` |",
                      "| install | 3.0 |", "reviewer never started", "| architect | ade-method | architect | # Architect | 1.0 | 3.0 |", "the hub has no frontend role", "200 MB", "| 77 |", "Telegram: stand-in both ways", "01-install", "| Terminal-only prompts after Telegram | 1 |"):
             self.assertIn(want, r)
+        r = flow.report("server", "ade 0.2.8", steps, screens, prompts, missing * 2, fixes, [], spawn, (0, 0), "")
+        self.assertEqual(r.count("| curl | command not found | install |"), 1)   # a tool seen twice on one screen: one row
 
 
 class Relay(unittest.TestCase):

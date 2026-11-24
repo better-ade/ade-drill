@@ -234,6 +234,7 @@ class Raw(g.Drill):
         done = next(((t, x) for t, x in texts() if x.startswith("Done:")), None)
         self.spawned = flow.team_summary(load("assign"), load("done"), texts(), t_msg, done)
         self.spawned["phone"] = [x for _, x in texts()]
+        if getattr(self, "samples", None): self.peaks = flow.peak(self.samples)   # so far; cleanup takes the whole run
         need(self.spawned["ok"], "; ".join(self.spawned["problems"]) + "; the phone shows: " + " | ".join(x[:160] for x in self.spawned["phone"][-6:]))
         return "all four up %.1f s after the message, Done %.1f s after it on the reviewer's green run; frontend and backend together: %s; peak %.0f MB, %d processes" % (
             self.spawned["all_up"], self.spawned["done_after"], "yes" if self.spawned["parallel"] else "no", self.peaks[0] / 1024.0, self.peaks[1])
@@ -290,10 +291,10 @@ class Raw(g.Drill):
         if not (REAL_TOKEN and REAL_CHAT):
             return "Telegram: the stand-in both ways (no ADE_DRILL_TELEGRAM_TOKEN and ADE_DRILL_TELEGRAM_CHAT: a pull request, or the secrets are not set)."
         rel = [m.get("relayed", "") for m in self.sent() if m.get("chat_id") == g.OWNER]
-        ok = sum(1 for r in rel if r == "ok"); bad = sorted({r for r in rel if r != "ok"})
-        return ("Telegram: half real. What the bot sent (%d messages) also went through the real Bot API to the real chat: %d "
-                "arrived%s. What the person sent came through the stand-in update feed; the real token was never polled "
-                "(no getUpdates, no setWebhook)." % (len(rel), ok, "; not relayed: " + ", ".join(bad) if bad else ""))
+        ok = sum(1 for r in rel if r == "ok"); held = sum(1 for r in rel if r.startswith("not relayed")); bad = sorted({r for r in rel if r != "ok" and not r.startswith("not relayed")})
+        return ("Telegram: half real. Of what the bot sent (%d messages), the run's handful (the connect test, one line per role, "
+                "the Done) also went through the real Bot API to the real chat: %d arrived, %d kept to the stand-in%s. What the person sent came through the stand-in update feed; the real token was never polled "
+                "(no getUpdates, no setWebhook)." % (len(rel), ok, held, "; failed: " + ", ".join(bad) if bad else ""))
 
     def cleanup(self):
         self.sampling = False
