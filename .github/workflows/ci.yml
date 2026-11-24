@@ -46,7 +46,7 @@ jobs:
           - { target: server }
           - { target: desktop }
           - { target: server, ade: main }
-          - { target: desktop, ade: main }
+          - { target: desktop, ade: main, record: "1" }   # also the run as a video (RAW_RECORD): no real bot here
     env:
       # the real-bot mode (story D4): only on a push or a dispatch in better-ade/ade-drill, never on a pull request, and in
       # one job only (server, ade main), so a run sends a handful of real messages
@@ -58,10 +58,14 @@ jobs:
           [ -z "$ADE_DRILL_TELEGRAM_TOKEN" ] || echo "::add-mask::$ADE_DRILL_TELEGRAM_TOKEN"
           [ -z "$ADE_DRILL_TELEGRAM_CHAT" ] || echo "::add-mask::$ADE_DRILL_TELEGRAM_CHAT"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: the video tools, on the runner (never in the person's container)
+        if: matrix.record
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg fonts-dejavu-core >/dev/null
       - name: the user flow on a raw Ubuntu ${{ matrix.target }}, with a stand-in for every account
         run: bash drills/raw-ubuntu.sh
         env:
           RAW_TARGET: ${{ matrix.target }}
+          RAW_RECORD: ${{ matrix.record }}
           GOLDEN_ADE_REF: ${{ matrix.ade }}
           GOLDEN_OUT: ${{ runner.temp }}/raw
       - name: the report and the transcripts
@@ -71,3 +75,12 @@ jobs:
           name: raw-${{ matrix.target }}-${{ matrix.ade || 'release' }}
           path: ${{ runner.temp }}/raw
           if-no-files-found: warn
+      - name: the video (MP4 and poster)
+        if: always() && matrix.record
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ade-d4-video
+          path: |
+            ${{ runner.temp }}/raw/video/ade-d4.mp4
+            ${{ runner.temp }}/raw/video/ade-d4.png
+          if-no-files-found: error

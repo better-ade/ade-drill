@@ -16,6 +16,11 @@ grep -q 'drills/raw-ubuntu.sh' .github/workflows/ci.yml && grep -q 'raw-${{ matr
   { echo "FAIL CI does not run the raw-ubuntu drill on pull requests and nightly, or does not upload its report"; rc=1; }
 grep -q "github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill'" .github/workflows/ci.yml &&
   grep -q '::add-mask::' .github/workflows/ci.yml || { echo "FAIL ci.yml gives the real-bot secrets to more than push in better-ade/ade-drill, or does not mask them"; rc=1; }
+# the raw-Ubuntu drill's recording mode (story D4): its logic, and CI records the desktop job only, where no real bot is
+python3 tests/test_video.py 2>&1 | tail -4 | grep -q '^OK' || { echo "FAIL tests/test_video.py"; python3 tests/test_video.py 2>&1 | tail -20; rc=1; }
+grep -q 'target: desktop, ade: main, record: "1"' .github/workflows/ci.yml && grep -q 'RAW_RECORD: ${{ matrix.record }}' .github/workflows/ci.yml &&
+  grep -q 'name: ade-d4-video' .github/workflows/ci.yml && ! grep -q 'target: server.*record' .github/workflows/ci.yml ||
+  { echo "FAIL CI does not record the desktop job (and only it) or does not upload the video"; rc=1; }
 # the golden-path drill's own parts (story D3); the drill itself needs the network and runs in CI's golden job
 python3 tests/test_golden.py 2>&1 | tail -4 | grep -q '^OK' || { echo "FAIL tests/test_golden.py"; python3 tests/test_golden.py 2>&1 | tail -20; rc=1; }
 grep -q 'drills/golden.sh' .github/workflows/ci.yml && grep -q 'upload-artifact@' .github/workflows/ci.yml && grep -q 'ade-cli-release' .github/workflows/nightly.yml ||

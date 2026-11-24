@@ -15,6 +15,8 @@ screen says once (or installs the missing command the way a person would) and tr
   GOLDEN_ADE_REF   empty: the release, by the README's one-line install; a branch (main): the README's git clone line
   GOLDEN_OUT       where report.md and transcripts/ go (default /out)
   RAW_DATA         the drill's prepared data, read-only: ade-brain/ (the hub template) and repos/website
+  RAW_RECORD       1: also <out>/video/ade-d4.cast and captions.json, the run as a video (drills/raw/video.py; the
+                   desktop target only, never with the real bot); drills/raw/record.sh renders them
   ADE_DRILL_TELEGRAM_TOKEN, ADE_DRILL_TELEGRAM_CHAT   the real-bot mode: what the bot sends also goes to that chat
                    (only the Bot API stand-in ever holds the token; it is in no file, screen or report)
 
@@ -31,12 +33,14 @@ _spec = importlib.util.spec_from_file_location("golden_run", os.path.join(GOLDEN
 g = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(g)
 sys.path.insert(0, HERE)
 import flow  # noqa: E402
+import video  # noqa: E402
 
 screens, Failed, need, line = g.screens, g.Failed, g.need, g.line
 TARGET = os.environ.get("RAW_TARGET", "server")
 ADE_REF = os.environ.get("GOLDEN_ADE_REF", "")
 DATA = os.environ.get("RAW_DATA", "/drill-data")
 OUT = g.OUT
+RECORD = os.environ.get("RAW_RECORD", "") == "1"
 ASK = "build a website"   # the owner's task, sent from Telegram: four roles build it (flow.ROLES)
 SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 PROMPT_END = re.compile(r"(\?|:|\]|\)|\.\.\.)$")
@@ -77,8 +81,10 @@ class Raw(g.Drill):
     # ---- the person ----
     def term(self, argv, cwd, name):
         """every terminal is a new window: a login shell (the golden act's own `bash -c ...` too)"""
+        typed = argv[4] if argv[:4] == ["bash", "-l", "-i", "-c"] and len(argv) == 5 else \
+            "cd %s && %s" % (cwd.replace(self.home, "~", 1), argv[2]) if argv[:2] == ["bash", "-c"] and len(argv) == 3 else shlex.join(argv)
         if argv[:3] != ["bash", "-l", "-i"]: argv = ["bash", "-l", "-i", "-c", shlex.join(argv)]
-        return super().term(argv, cwd, name)
+        t = super().term(argv, cwd, name); t.typed = typed; t.step = self.step; return t
 
     def run(self, argv, cwd=None, check=True, stdin=None, timeout=300):
         """the drill's own checks (never the person's): with ade and Claude Code where the installers put them"""
@@ -287,6 +293,22 @@ class Raw(g.Drill):
             out.append((n, text, sec))
         return out
 
+    def record_video(self):
+        """RAW_RECORD=1: the run as an asciicast and the caption's times, for drills/raw/record.sh (no real bot here)"""
+        need(not REAL_TOKEN, "the recording mode never runs with the real bot")
+        try: phone = [json.loads(l) for l in open(os.path.join(self.tg, "phone.jsonl")) if l.strip()]
+        except OSError: phone = []
+        s = self.spawned
+        team = ("all four roles up in %.1f s; frontend and backend together: %s; Done in %.1f s" % (
+            s["all_up"], "yes" if s["parallel"] else "no", s["done_after"])) if s and s.get("ok") else None
+        screens = [{"name": n, "step": getattr(t, "step", ""), "typed": getattr(t, "typed", ""), "raw": t.raw, "marks": t.marks} for n, t in self.shown]
+        subs = [(self.work, "<drill>"), (self.env["ADE_TMUX_SOCKET"], "ade-raw"), (self.tmux, "<tmux>")]
+        cast, caps = video.recording(screens, phone, ASK, known=(g.OWNER,), team=team, subs=subs)
+        d = os.path.join(OUT, "video"); os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "ade-d4.cast"), "w") as f: f.write(cast)
+        with open(os.path.join(d, "captions.json"), "w") as f: json.dump({"caption": video.CAPTION, "title": video.TITLE, "show": caps}, f)
+        return os.path.join(d, "ade-d4.cast")
+
     def mode_note(self):
         if not (REAL_TOKEN and REAL_CHAT):
             return "Telegram: the stand-in both ways (no ADE_DRILL_TELEGRAM_TOKEN and ADE_DRILL_TELEGRAM_CHAT: a pull request, or the secrets are not set)."
@@ -348,8 +370,9 @@ def main():
         os.makedirs(OUT, exist_ok=True)
         with open(os.path.join(OUT, "report.md"), "w") as f: f.write(rep)
         print("report: %s" % os.path.join(OUT, "report.md"))
-    except (OSError, KeyError, ValueError, TypeError) as e:
-        failed = True; print("FAIL    the report: %s: %s" % (e.__class__.__name__, e))
+        if RECORD and d: print("recording: %s" % d.record_video())
+    except (Failed, OSError, KeyError, ValueError, TypeError) as e:
+        failed = True; print("FAIL    the report or the recording: %s: %s" % (e.__class__.__name__, e))
     if REAL_TOKEN:   # the real token is in nothing the drill leaves behind
         for root, _, files in os.walk(OUT):
             for n in files:
