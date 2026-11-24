@@ -2,6 +2,7 @@ name: ci
 on:
   pull_request:
   push: { branches: [main] }
+  workflow_dispatch:   # one run from a branch checks the real-bot mode before a merge
 permissions: { contents: read }
 jobs:
   ci:
@@ -33,4 +34,40 @@ jobs:
         with:
           name: golden-${{ matrix.os }}-${{ matrix.ade || 'release' }}
           path: ${{ runner.temp }}/golden
+          if-no-files-found: warn
+  raw-ubuntu:
+    name: raw Ubuntu ${{ matrix.target }} (ade ${{ matrix.ade || 'release' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: server }
+          - { target: desktop }
+          - { target: server, ade: main }
+          - { target: desktop, ade: main }
+    env:
+      # the real-bot mode (story D4): only on a push or a dispatch in better-ade/ade-drill, never on a pull request, and in
+      # one job only (server, ade main), so a run sends a handful of real messages
+      ADE_DRILL_TELEGRAM_TOKEN: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+      ADE_DRILL_TELEGRAM_CHAT: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
+    steps:
+      - name: mask the real bot's token and chat
+        run: |
+          [ -z "$ADE_DRILL_TELEGRAM_TOKEN" ] || echo "::add-mask::$ADE_DRILL_TELEGRAM_TOKEN"
+          [ -z "$ADE_DRILL_TELEGRAM_CHAT" ] || echo "::add-mask::$ADE_DRILL_TELEGRAM_CHAT"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: the user flow on a raw Ubuntu ${{ matrix.target }}, with a stand-in for every account
+        run: bash drills/raw-ubuntu.sh
+        env:
+          RAW_TARGET: ${{ matrix.target }}
+          GOLDEN_ADE_REF: ${{ matrix.ade }}
+          GOLDEN_OUT: ${{ runner.temp }}/raw
+      - name: the report and the transcripts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: raw-${{ matrix.target }}-${{ matrix.ade || 'release' }}
+          path: ${{ runner.temp }}/raw
           if-no-files-found: warn

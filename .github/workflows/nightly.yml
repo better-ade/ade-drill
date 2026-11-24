@@ -37,7 +37,7 @@ jobs:
         run: ${{ matrix.command }}
   drill:
     needs: plan
-    name: drill ${{ matrix.name }} (${{ matrix.os }}${{ matrix.ade && format(', ade {0}', matrix.ade) || '' }})
+    name: drill ${{ matrix.name }} (${{ matrix.os }}${{ matrix.target && format(', {0}', matrix.target) || '' }}${{ matrix.ade && format(', ade {0}', matrix.ade) || '' }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -49,16 +49,35 @@ jobs:
       - name: setup
         if: matrix.setup
         run: ${{ matrix.setup }}
+      - name: mask the real bot's token and chat
+        if: matrix.name == 'raw-ubuntu'
+        env:
+          T: ${{ (github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+          C: ${{ (github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
+        run: |
+          [ -z "$T" ] || echo "::add-mask::$T"
+          [ -z "$C" ] || echo "::add-mask::$C"
       - run: bash drills/run.sh ${{ matrix.name }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GOLDEN_ADE_REF: ${{ matrix.ade }}
           GOLDEN_OUT: ${{ runner.temp }}/golden
+          RAW_TARGET: ${{ matrix.target }}
+          # the real-bot mode (story D4): schedule and dispatch only, in better-ade/ade-drill, one job (server, ade main)
+          ADE_DRILL_TELEGRAM_TOKEN: ${{ (matrix.name == 'raw-ubuntu' && matrix.target == 'server' && matrix.ade == 'main' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+          ADE_DRILL_TELEGRAM_CHAT: ${{ (matrix.name == 'raw-ubuntu' && matrix.target == 'server' && matrix.ade == 'main' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
       - name: the golden path's transcripts and first-run report
         if: always() && matrix.name == 'golden'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: golden-${{ matrix.os }}-${{ matrix.ade || 'release' }}
+          path: ${{ runner.temp }}/golden
+          if-no-files-found: warn
+      - name: the raw-Ubuntu report and transcripts
+        if: always() && matrix.name == 'raw-ubuntu'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: raw-${{ matrix.target }}-${{ matrix.ade || 'release' }}
           path: ${{ runner.temp }}/golden
           if-no-files-found: warn
   report:
