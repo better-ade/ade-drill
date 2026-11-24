@@ -11,3 +11,9 @@
   on the team's chat, and a footer with what the drill measured.
 - **Secrets:** every text goes through `redact()`; the cast is refused when `leaks()` still finds a bot token, a chat
   id, a home path with a user name or an email. The recording mode refuses the real bot.
+- **Stages (after the setup):** seven, each with its caption on the top row: Feature (the ask on the phone), Design
+  (the architect's `docs/architecture.md`), Tasks (the main agent's `dispatch:` and `assign:` lines in claude.log),
+  Development (frontend's and backend's files side by side, with their measured times), Changes (`git status --short`
+  and `git log --oneline` in the website repo: the agents commit nothing, so no PR is shown), Review (the reviewer's
+  own run, from the stand-in's `reviewer-run.txt`) and Ship (the phone to Done, last). A stage the run gave nothing for
+  is left out; the Review and Ship captions say red or not Done when that is what happened.

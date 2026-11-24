@@ -133,5 +133,71 @@ class Cast(unittest.TestCase):
         self.assertEqual(video.CAPTION, "Claude sign-in and the focus agents' work are stand-ins in this recording")
 
 
+WORK = {"design": "# Architecture\n\nA one-page website.\n\n## Verification command\n\n`bash tests/verify.sh`\n",
+        "log": ["dispatch: ade project add ~/Project/website --no-init --yes", "dispatch: bin/dispatch --list projects/website",
+                "assign: architect: ade work --role architect --name website-architect projects/website",
+                "assign: frontend: ade work --role builder --name website-frontend projects/website",
+                "assign: backend: ade work --role builder --name website-backend projects/website",
+                "assign: reviewer: ade work --role reviewer --name website-reviewer projects/website"],
+        "files": [("index.html", "<!doctype html>\n<h1>Hello</h1>\n"), ("server.js", "Bun.serve({ port })\n")],
+        "timing": "frontend 3.4-5.5 s, backend 3.6-5.7 s after the ask: together",
+        "changes": [("git status --short", "?? docs/\n?? index.html\n?? server.js\n?? tests/"), ("git log --oneline", "1a2b3c4 website")],
+        "review": {"cmd": "bash tests/verify.sh", "out": "green: index.html is there, /api/health answers ok", "result": "green"}}
+PHONE = [{"who": "you", "text": "hello"}, {"who": "your bot", "text": "Paired!"}, {"who": "you", "text": "build a website"},
+         {"who": "your bot", "text": 'note: "architect: done"'}, {"who": "your bot", "text": 'note: "reviewer: green"'},
+         {"who": "your bot", "text": "Done: build a website"}]
+SCREENS = [{"name": "install", "step": "install", "typed": "curl -fsSL https://x/install.sh | bash", "raw": b"installed\r\n", "marks": [(0.0, 0), (1.0, 11)]}]
+
+
+class Stages(unittest.TestCase):
+    def test_the_seven_stage_captions_are_short_plain_and_in_the_owners_order(self):
+        caps = video.stage_captions("green", True)
+        self.assertEqual(caps, ["Feature: asked on Telegram", "Design: the architect's note", "Tasks: dispatch, then roles assigned",
+                                "Development: frontend and backend together", "Changes: new files, no PR",
+                                "Review: verification run, green", "Ship: Done, last on Telegram"])
+        for c in caps: self.assertTrue(2 <= len(c.split()) <= 6, c)
+
+    def test_a_caption_says_what_happened_when_the_run_went_wrong(self):
+        caps = video.stage_captions("red", False)
+        self.assertEqual(caps[5], "Review: verification run, red"); self.assertEqual(caps[6], "Ship: not Done")
+
+    def test_the_stages_come_in_order_each_with_its_caption_and_what_the_drill_made(self):
+        cast, caps = video.recording(SCREENS, PHONE, ask="build a website", work=WORK)
+        ev = [json.loads(l) for l in cast.strip().split("\n")[1:]]
+        firsts = []
+        for c in video.stage_captions("green", True):
+            at = [i for i, e in enumerate(ev) if c in video.plain(e[2])]
+            self.assertTrue(at, c); firsts.append(at[0])
+        self.assertEqual(firsts, sorted(firsts))
+        text = lambda c: video.plain("".join(e[2] for e in ev if c in video.plain(e[2])))
+        self.assertIn("build a website", text("Feature:"))
+        self.assertIn("## Verification command", text("Design:"))
+        self.assertIn("bin/dispatch --list projects/website", text("Tasks:"))
+        self.assertIn("--role builder --name website-frontend", text("Tasks:"))
+        dev = text("Development:")
+        both = [l for l in dev.split("\n") if "index.html" in l and "server.js" in l]
+        self.assertTrue(both, "frontend and backend side by side"); self.assertIn("Bun.serve", dev); self.assertIn("together", dev)
+        ch = text("Changes:")
+        self.assertIn("$ git status --short", ch); self.assertIn("?? index.html", ch); self.assertIn("1a2b3c4 website", ch)
+        self.assertNotRegex(ch.replace("no PR", ""), r"(?i)pull request|\bPR\b|merged")
+        rv = text("Review:")
+        self.assertIn("$ bash tests/verify.sh", rv); self.assertIn("green: index.html is there", rv)
+        ship = [e for e in ev if "Ship:" in video.plain(e[2])]
+        self.assertIn("Done: build a website", video.plain(ship[-1][2]))
+        last = video.plain(ship[-1][2])
+        self.assertGreater(last.index("Done: build a website"), last.index("reviewer: green"))   # Done last on the phone
+        # every stage is the agents' stand-in work: the caption shows on each
+        for t, _, x in ev:
+            if any(c in video.plain(x) for c in video.stage_captions("green", True)): self.assertIn(video.CAPTION, x)
+        self.assertLessEqual(ev[-1][0], video.BUDGET)
+
+    def test_a_stage_with_nothing_from_the_run_is_left_out_not_made_up(self):
+        work = dict(WORK, changes=[], design="")
+        cast, _ = video.recording(SCREENS, PHONE, ask="build a website", work=work)
+        text = video.plain(cast)
+        self.assertNotIn("Changes:", text); self.assertNotIn("Design:", text)
+        self.assertIn("Tasks: dispatch", text); self.assertIn("Ship: Done", text)
+
+
 if __name__ == "__main__":
     unittest.main()

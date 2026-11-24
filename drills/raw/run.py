@@ -293,6 +293,32 @@ class Raw(g.Drill):
             out.append((n, text, sec))
         return out
 
+    def work_shown(self):
+        """what the run made, for the recording's stages: the architect's note, the main agent's dispatch and assignments
+        (its lines in claude.log), frontend's and backend's files and times, the website repo's git status and log, and
+        the reviewer's run (the stand-in's reviewer-run.txt); empty where the run made nothing"""
+        repo = os.path.join(self.home, "Project", "website")
+        def read(*p):
+            try: return open(os.path.join(*p), errors="replace").read()
+            except OSError: return ""
+        log = [l[len("orchestrator: "):] for l in read(self.state, "claude.log").split("\n") if l.startswith("orchestrator: ")]
+        log = [l for l in log if l.startswith(("dispatch: ", "assign: ")) or re.match(r"roles: ade (init|agent add \S+)$", l)]
+        files = [(n, read(repo, n)) for n in ("index.html", "server.js")]
+        rows = {r[0]: r for r in (self.spawned or {}).get("rows", [])}
+        f, b = rows.get("frontend"), rows.get("backend")
+        timing = ("frontend up %.1f s, done %.1f s; backend up %.1f s, done %.1f s (after the ask): %s" % (
+            f[4], f[5], b[4], b[5], "at the same time" if (self.spawned or {}).get("parallel") else "one after the other")
+            if f and b and None not in (f[4], f[5], b[4], b[5]) else "")
+        changes = []
+        for c in ("git status --short", "git log --oneline"):
+            rc, out = self.shell("cd ~/Project/website && " + c)
+            if rc == 0 and out: changes.append((c, out))
+        run = read(self.state, "reviewer-run.txt").rstrip("\n").split("\n", 1)
+        rv = rows.get("reviewer")
+        review = {"cmd": run[0], "out": run[1] if len(run) > 1 else "", "result": rv[7] if rv else ""} if run[0] else {}
+        return {"design": read(repo, "docs", "architecture.md"), "log": log, "files": [x for x in files if x[1]] if all(t for _, t in files) else [],
+                "timing": timing, "changes": changes, "review": review}
+
     def record_video(self):
         """RAW_RECORD=1: the run as an asciicast and the caption's times, for drills/raw/record.sh (no real bot here)"""
         need(not REAL_TOKEN, "the recording mode never runs with the real bot")
@@ -303,7 +329,7 @@ class Raw(g.Drill):
             s["all_up"], "yes" if s["parallel"] else "no", s["done_after"])) if s and s.get("ok") else None
         screens = [{"name": n, "step": getattr(t, "step", ""), "typed": getattr(t, "typed", ""), "raw": t.raw, "marks": t.marks} for n, t in self.shown]
         subs = [(self.work, "<drill>"), (self.env["ADE_TMUX_SOCKET"], "ade-raw"), (self.tmux, "<tmux>")]
-        cast, caps = video.recording(screens, phone, ASK, known=(g.OWNER,), team=team, subs=subs)
+        cast, caps = video.recording(screens, phone, ASK, known=(g.OWNER,), team=team, subs=subs, work=self.work_shown())
         d = os.path.join(OUT, "video"); os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "ade-d4.cast"), "w") as f: f.write(cast)
         with open(os.path.join(d, "captions.json"), "w") as f: json.dump({"caption": video.CAPTION, "title": video.TITLE, "show": caps}, f)
