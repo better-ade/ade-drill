@@ -15,6 +15,8 @@ Name for your hub	@hub
 Kind of teammate	1
 Who this hub works for	Drill
 Owner \(your name	Drill Owner
+Your name, for git commits	Drill Owner
+Your email, for git commits	drill@example.invalid
 ^Pick one	claude-account
 ^Pick any	anthropic
 Do you want to reach your main agent from Telegram\?	y
