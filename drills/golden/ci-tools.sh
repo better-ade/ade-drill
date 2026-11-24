@@ -1,6 +1,6 @@
 #!/bin/bash
-# The real tools the golden-path drill needs on a CI runner (it installs none itself): tmux and gitleaks, and with
-# "chromium" Playwright's Chromium (ade shot takes its pictures with it; only an ade that has ade shot needs it).
+# The real tools the golden-path drill needs on a CI runner (it installs none itself): tmux, gitleaks and Playwright's
+# Chromium (ade shot takes its pictures with it; every ade since the 0.2.10 release has ade shot).
 set -eu
 if [ "$(uname -s)" = Darwin ]; then
   command -v tmux >/dev/null 2>&1 || brew install tmux
@@ -11,5 +11,5 @@ else
     curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar xz gitleaks
     sudo mv gitleaks /usr/local/bin/; }
 fi
-[ "${1:-}" != chromium ] || npx -y playwright install chromium
+npx -y playwright install chromium
 tmux -V; gitleaks version
