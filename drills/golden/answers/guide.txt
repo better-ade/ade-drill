@@ -1,6 +1,12 @@
 # The person at the terminal of `ade setup`, on a machine with nothing set up. Each line: the text to wait for, a tab,
 # then what to type (see guide() in run.py for the @ words). Order matters: each line is waited for after the one before.
-?This runs: sudo apt-get install	n
+?This runs: sudo apt-get	n
+?This runs: brew install	n
+?Set up now?	y
+?Open the GitHub address in this computer's browser?	y
+?Your name, for git commits	Drill Owner
+?Your email, for git commits	drill@example.invalid
+?Which tools do you use for this work? Pick any (numbers or names, spaces between; Enter skips)	@enter
 ?Install it now?	y
 How do you use Claude?	account
 Press Enter to open github.com	@enter
