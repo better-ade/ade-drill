@@ -38,8 +38,8 @@ for i in 1 2 3 4 5; do
 done
 chmod -R a+rX "$data"
 
-# the image: ubuntu:24.04, the person `you` with password-less sudo (every use logged), the apt hook for the stand-ins
-common='RUN useradd -m -s /bin/bash you && printf "you ALL=(ALL) NOPASSWD:ALL\nDefaults logfile=/var/log/sudo-drill.log, log_year, loglinelen=0\n" > /etc/sudoers.d/you && chmod 440 /etc/sudoers.d/you \
+# the image: ubuntu:24.04, the person `you` in the sudo group (as an installer's first user is) with password-less sudo (every use logged), the apt hook for the stand-ins
+common='RUN useradd -m -s /bin/bash -G sudo you && printf "you ALL=(ALL) NOPASSWD:ALL\nDefaults logfile=/var/log/sudo-drill.log, log_year, loglinelen=0\n" > /etc/sudoers.d/you && chmod 440 /etc/sudoers.d/you \
  && printf "DPkg::Post-Invoke { \"sh /drill/drills/raw/stand-ins.sh || true\"; };\n" > /etc/apt/apt.conf.d/99drill-stand-ins && touch /etc/ade-raw-drill \
  && for t in curl git tmux gh gitleaks; do if command -v $t; then echo "the image has $t" >&2; exit 1; fi; done'
 if [ "$target" = server ]; then

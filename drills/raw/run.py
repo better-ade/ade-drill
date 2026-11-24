@@ -73,7 +73,7 @@ class Raw(g.Drill):
         if TARGET == "desktop": self.env["DISPLAY"] = os.environ.get("DISPLAY", ":99")
         self.rules = flow.parse_rules(open(os.path.join(HERE, "answers.txt")).read())
         self.prompts = []; self.missing = []; self.fixes = []; self.done_fixes = set(); self.windows = []
-        self.spawn = None; self.peaks = (0, 0); self.step = "prepare"
+        self.spawned = None; self.peaks = (0, 0); self.step = "prepare"
 
     # ---- the person ----
     def term(self, argv, cwd, name):
@@ -163,7 +163,8 @@ class Raw(g.Drill):
     # ---- the flow ----
     def prepare(self):
         env = dict(os.environ)
-        if REAL_TOKEN and REAL_CHAT: env.update(DRILL_TG_RELAY_TOKEN=REAL_TOKEN, DRILL_TG_RELAY_CHAT=REAL_CHAT)
+        if REAL_TOKEN and REAL_CHAT:   # a handful of real messages a run: the guide's connect check, one line per agent
+            env.update(DRILL_TG_RELAY_TOKEN=REAL_TOKEN, DRILL_TG_RELAY_CHAT=REAL_CHAT, DRILL_TG_RELAY_MATCH=r"^(Test from the|\[svc-[0-9]+\] note: )", DRILL_TG_RELAY_MAX="6")
         self.botapi = subprocess.Popen([sys.executable, "-I", os.path.join(GOLDEN, "fakes", "botapi.py"), self.tg, g.TOKEN, g.OWNER], env=env,
                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=open(os.path.join(self.tg, "errors.log"), "w"))
         del env
@@ -230,11 +231,11 @@ class Raw(g.Drill):
         self.sampling = False; self.peaks = flow.peak(self.samples)
         for l in self.claude_log().split("\n"):
             for tool, how, ln in flow.missing_tools("spawn", l): self.missing.append([tool, how, ln, "spawn", None])
-        self.spawn = flow.spawn_summary(NAMES, ups, [(0, r) for r in replies()], self.home, t_msg)
-        self.spawn["phone"] = replies()
-        need(self.spawn["ok"], "; ".join(self.spawn["problems"]) + "; the phone shows: " + " | ".join(r[:120] for r in replies()[-4:]))
+        self.spawned = flow.spawn_summary(NAMES, ups, [(0, r) for r in replies()], self.home, t_msg)
+        self.spawned["phone"] = replies()
+        need(self.spawned["ok"], "; ".join(self.spawned["problems"]) + "; the phone shows: " + " | ".join(r[:120] for r in replies()[-4:]))
         return "all five up %.1f s after the message, each in its own checkout, each reported; peak %.0f MB, %d processes" % (
-            self.spawn["all_up"], self.peaks[0] / 1024.0, self.peaks[1])
+            self.spawned["all_up"], self.peaks[0] / 1024.0, self.peaks[1])
 
     def no_leak(self):
         got = super().no_leak()
@@ -252,7 +253,7 @@ class Raw(g.Drill):
         """what became of each missing tool: fixed by the person, installed by the guide, or still missing"""
         path = ":".join((os.path.join(self.home, ".local", "bin"), os.path.join(self.home, ".bun", "bin"), SYSTEM_PATH))
         for m in self.missing:
-            fix = next((f[2] for f in self.fixes if f[0] == m[3] and re.search(r"\b%s\b" % re.escape(flow.PKG.get(m[0], m[0])), f[2])), None)
+            fix = next((f[2] for f in reversed(self.fixes) if f[0] == m[3] and "(exit " not in f[2] and re.search(r"\b%s\b" % re.escape(flow.PKG.get(m[0], m[0])), f[2])), None)
             m[4] = ("fixed: " + fix) if fix else "installed by the guide" if shutil.which(m[0], path=path) and m[1] == "the guide offered to install it" \
                 else "there now" if shutil.which(m[0], path=path) else "still missing"
         return [tuple(m) for m in self.missing]
@@ -325,7 +326,7 @@ def main():
             t0 = time.time()
             try: detail = getattr(d, method)(); line("ok", name, detail or "", time.time() - t0)
             except Failed as e: failed = True; line("FAIL", name, str(e), time.time() - t0)
-            except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError) as e:
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
                 failed = True; line("FAIL", name, "%s: %s" % (e.__class__.__name__, e), time.time() - t0)
             d.windows.append((d.step, t0, time.time()))
     except (Failed, OSError, ValueError) as e:
@@ -341,7 +342,7 @@ def main():
         shown = d.record_all() if d else []
         prompts = flow.mark_phases(d.prompts if d else [])
         rep = flow.report(TARGET, ver, g.RESULTS, shown, prompts, d.outcomes() if d else [], d.fixes if d else [], d.sudo() if d else [],
-                          d.spawn if d else None, d.peaks if d else (0, 0), d.mode_note() if d else "")
+                          d.spawned if d else None, d.peaks if d else (0, 0), d.mode_note() if d else "")
         os.makedirs(OUT, exist_ok=True)
         with open(os.path.join(OUT, "report.md"), "w") as f: f.write(rep)
         print("report: %s" % os.path.join(OUT, "report.md"))

@@ -75,6 +75,9 @@ class Missing(unittest.TestCase):
         # command-not-found's advice: the apt line, not the snap one
         f = flow.fix_for("Command 'curl' not found, but can be installed with:\nsudo snap install curl  # version 8\nsudo apt  install curl\n", set())
         self.assertEqual(f, ("the screen says: sudo apt  install curl", ["sudo apt-get install -y curl"], "advised"))
+        # command-not-found for a person outside the sudo group: a bare apt line; "Please ask..." is not a command
+        f = flow.fix_for("Command 'git' not found, but can be installed with:\napt install git\nPlease ask your administrator.\nbash: line 1: Please: command not found\n", set())
+        self.assertEqual(f, ("the screen says: apt install git", ["sudo apt-get install -y git"], "advised"))
         # ade's own line: apt-get update first
         f = flow.fix_for("sudo apt-get install -y git failed (exit 100); when apt cannot find a package, run apt-get update first\n", set())
         self.assertEqual(f[1], ["sudo apt-get update"])
@@ -173,19 +176,24 @@ class Relay(unittest.TestCase):
                 while not os.path.exists(os.path.join(state, "port")) and time.time() < end: time.sleep(0.05)
                 return "http://127.0.0.1:" + open(os.path.join(state, "port")).read().strip()
             upstream = start(up, real, "777", dict(os.environ))   # plays the real Bot API
-            env = dict(os.environ, DRILL_TG_RELAY_TOKEN=real, DRILL_TG_RELAY_CHAT="777", DRILL_TG_RELAY_API=upstream)
+            env = dict(os.environ, DRILL_TG_RELAY_TOKEN=real, DRILL_TG_RELAY_CHAT="777", DRILL_TG_RELAY_API=upstream,
+                       DRILL_TG_RELAY_MATCH=r"^\[svc-\d+\] note:", DRILL_TG_RELAY_MAX="2")
             api = start(me, standin, "42", env)
             def call(path, body):
                 req = urllib.request.Request(api + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
                 return json.load(urllib.request.urlopen(req, timeout=10))
             call("/phone/say", {"text": "start 5 focus agents"})
             self.assertEqual(call("/bot%s/getUpdates" % standin, {"timeout": 0})["result"][0]["message"]["text"], "start 5 focus agents")
-            self.assertTrue(call("/bot%s/sendMessage" % standin, {"chat_id": "42", "text": "[svc-1] note: up"})["ok"])
+            # only what matches goes to the real chat, and at most the cap (a handful of messages a run)
+            for text in ("Pairing required", "[svc-1] note: up", "[svc-2] idle: waiting", "[svc-2] note: up", "[svc-3] note: up"):
+                self.assertTrue(call("/bot%s/sendMessage" % standin, {"chat_id": "42", "text": text})["ok"])
             got = [json.loads(l) for l in open(os.path.join(up, "sent.jsonl"))]
-            self.assertEqual([(g["method"], g["chat_id"], g["text"]) for g in got], [("sendMessage", "777", "[svc-1] note: up")])
-            self.assertEqual([l.split()[0] for l in open(os.path.join(up, "methods.log"))], ["sendMessage"])   # never getUpdates
+            self.assertEqual([(g["method"], g["chat_id"], g["text"]) for g in got], [("sendMessage", "777", "[svc-1] note: up"), ("sendMessage", "777", "[svc-2] note: up")])
+            self.assertEqual([l.split()[0] for l in open(os.path.join(up, "methods.log"))], ["sendMessage"] * 2)   # never getUpdates
             mine = open(os.path.join(me, "sent.jsonl")).read()
-            self.assertIn('"relayed": "ok"', mine)
+            self.assertEqual(mine.count('"relayed": "ok"'), 2)
+            self.assertIn('"relayed": "not relayed: over the cap"', mine)
+            self.assertIn('"relayed": "not relayed: not a message the run sends for real"', mine)
             for f in os.listdir(me):
                 p = os.path.join(me, f)
                 if os.path.isfile(p): self.assertNotIn(real, open(p, errors="replace").read(), f)

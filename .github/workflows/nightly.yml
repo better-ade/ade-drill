@@ -52,8 +52,8 @@ jobs:
       - name: mask the real bot's token and chat
         if: matrix.name == 'raw-ubuntu'
         env:
-          T: ${{ github.repository == 'better-ade/ade-drill' && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
-          C: ${{ github.repository == 'better-ade/ade-drill' && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
+          T: ${{ (github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+          C: ${{ (github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
         run: |
           [ -z "$T" ] || echo "::add-mask::$T"
           [ -z "$C" ] || echo "::add-mask::$C"
@@ -63,9 +63,9 @@ jobs:
           GOLDEN_ADE_REF: ${{ matrix.ade }}
           GOLDEN_OUT: ${{ runner.temp }}/golden
           RAW_TARGET: ${{ matrix.target }}
-          # the real-bot mode (story D4): the nightly runs on schedule and dispatch only, in better-ade/ade-drill
-          ADE_DRILL_TELEGRAM_TOKEN: ${{ (matrix.name == 'raw-ubuntu' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
-          ADE_DRILL_TELEGRAM_CHAT: ${{ (matrix.name == 'raw-ubuntu' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
+          # the real-bot mode (story D4): schedule and dispatch only, in better-ade/ade-drill, one job (server, ade main)
+          ADE_DRILL_TELEGRAM_TOKEN: ${{ (matrix.name == 'raw-ubuntu' && matrix.target == 'server' && matrix.ade == 'main' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+          ADE_DRILL_TELEGRAM_CHAT: ${{ (matrix.name == 'raw-ubuntu' && matrix.target == 'server' && matrix.ade == 'main' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
       - name: the golden path's transcripts and first-run report
         if: always() && matrix.name == 'golden'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

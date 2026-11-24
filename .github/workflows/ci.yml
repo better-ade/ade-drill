@@ -2,6 +2,7 @@ name: ci
 on:
   pull_request:
   push: { branches: [main] }
+  workflow_dispatch:   # one run from a branch checks the real-bot mode before a merge
 permissions: { contents: read }
 jobs:
   ci:
@@ -47,9 +48,10 @@ jobs:
           - { target: server, ade: main }
           - { target: desktop, ade: main }
     env:
-      # the real-bot mode (story D4): only on a push in better-ade/ade-drill, never on a pull request
-      ADE_DRILL_TELEGRAM_TOKEN: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
-      ADE_DRILL_TELEGRAM_CHAT: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
+      # the real-bot mode (story D4): only on a push or a dispatch in better-ade/ade-drill, never on a pull request, and in
+      # one job only (server, ade main), so a run sends a handful of real messages
+      ADE_DRILL_TELEGRAM_TOKEN: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_TOKEN || '' }}
+      ADE_DRILL_TELEGRAM_CHAT: ${{ (github.event_name != 'pull_request' && github.repository == 'better-ade/ade-drill' && matrix.target == 'server' && matrix.ade == 'main') && secrets.ADE_DRILL_TELEGRAM_CHAT || '' }}
     steps:
       - name: mask the real bot's token and chat
         run: |

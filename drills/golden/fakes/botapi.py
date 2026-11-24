@@ -19,10 +19,11 @@ Every Bot API method called is appended to <state folder>/methods.log (its name 
 Relay (story D4, the real-bot mode): with DRILL_TG_RELAY_TOKEN and DRILL_TG_RELAY_CHAT in the environment, everything
 the bot sends to the owner is also sent, as it is, to that chat through the real Bot API (DRILL_TG_RELAY_API, default
 https://api.telegram.org), and the row records "relayed": "ok" or why not. Only sendMessage, sendPhoto and
-sendDocument are relayed: the relay never calls getUpdates or setWebhook, so a hub live on the same bot keeps its
+sendDocument are relayed (with DRILL_TG_RELAY_MATCH, only a text or caption it matches; with DRILL_TG_RELAY_MAX, at
+most that many a run): the relay never calls getUpdates or setWebhook, so a hub live on the same bot keeps its
 messages. The real token is read once, taken out of the environment, and never written anywhere.
 """
-import json, os, secrets, sys, threading, time, urllib.error, urllib.parse, urllib.request
+import json, os, re, secrets, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 STATE, TOKEN, OWNER = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -34,11 +35,17 @@ MSG = [1]
 RELAY_TOKEN = os.environ.pop("DRILL_TG_RELAY_TOKEN", ""); RELAY_CHAT = os.environ.pop("DRILL_TG_RELAY_CHAT", "")
 RELAY_API = os.environ.pop("DRILL_TG_RELAY_API", "") or "https://api.telegram.org"
 RELAYED = ("sendMessage", "sendPhoto", "sendDocument")
+# a real run sends a handful only: DRILL_TG_RELAY_MATCH (a regex on the text or caption) picks which, DRILL_TG_RELAY_MAX caps them
+RELAY_MATCH = os.environ.pop("DRILL_TG_RELAY_MATCH", ""); RELAY_MAX = int(os.environ.pop("DRILL_TG_RELAY_MAX", "") or 0); RELAY_N = [0]
 
 
 def relay(method, p, names):
     """the same message to the real chat: "ok", or why not (never the token: Telegram's own description at most)"""
     if method not in RELAYED: return "not relayed: %s" % method
+    if RELAY_MATCH and not re.search(RELAY_MATCH, str(p.get("text", p.get("caption", "")))): return "not relayed: not a message the run sends for real"
+    with LOCK:
+        if RELAY_MAX and RELAY_N[0] >= RELAY_MAX: return "not relayed: over the cap"
+        RELAY_N[0] += 1
     url = "%s/bot%s/%s" % (RELAY_API, RELAY_TOKEN, method)
     if method == "sendMessage":
         body = json.dumps({"chat_id": RELAY_CHAT, "text": str(p.get("text", ""))[:4096]}).encode(); ctype = "application/json"

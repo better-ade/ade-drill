@@ -85,7 +85,7 @@ def fix_for(text, done):
         if "git config --global user.name" in l:
             cands.append(("the screen says: " + l, ['git config --global user.name "Drill Owner"', "git config --global user.email drill@example.invalid"], "advised"))
         m = re.match(r"^(?:.*: )?(?:sudo )?apt(?:-get)?\s+install\s+(?:-y\s+)?([\w.+ -]+?)$", l)
-        if m and l.startswith(("sudo ", "run ")) or (m and ": sudo apt" in l):
+        if m and (l.startswith(("sudo ", "run ", "apt ", "apt-get ")) or ": sudo apt" in l):
             cands.append(("the screen says: " + l, ["sudo apt-get install -y " + " ".join(m.group(1).split())], "advised"))
     for l in lines:
         m = re.search(r"(?:^|: )([\w.+-]+): command not found$", l)
