@@ -1,7 +1,7 @@
 #!/bin/bash
 # The scripted model as the hub's main agent on the raw targets (story D4), run by the Claude Code stand-in at the hub
 # root when the paired owner's message arrives: orchestrator.sh <file holding the message>. Lines that start with
-# "REPLY: " go to the chat. For "build a website" it is the coordinator of four roles, with what the hub and ade give it:
+# "REPLY: " go to the chat; the final Done or Not done goes through the hub's bin/chat done. For "build a website" it is the coordinator of four roles, with what the hub and ade give it:
 #   ade project add ~/Project/website (the README's way to load a repo you have), ade init (the core roles, from
 #   ade-method), ade agent add frontend and backend (specialists, from ade-agent-registry), bin/dispatch --list (the hub's
 #   ticket dispatch: shown, it starts BMAD tickets only), then ade work --role <hub role> per role, in order: architect;
@@ -34,5 +34,8 @@ assign architect ade-method && wait_done architect || exit 1
 assign frontend ade-agent-registry; f=$?; assign backend ade-agent-registry; b=$?
 [ "$f$b" = 00 ] && wait_done frontend backend || exit 1
 assign reviewer ade-method && wait_done reviewer || exit 1
-if grep -q '"result": "green"' "$st/done-reviewer.json"; then echo "REPLY: Done: build a website; the reviewer's run of the verification command is green"
-else echo "REPLY: Not done: build a website; the reviewer's run is red"; fi
+# The final word goes through bin/chat done (ade-brain P2): the agents' queued notes first, then this, last. A hub from
+# before P2 has no `done`; there it is a REPLY, as before.
+final() { if grep -q '^ *"done")' "$hub/bin/chat" 2>/dev/null; then "$hub/bin/chat" done "$1"; else echo "REPLY: $1"; fi; }
+if grep -q '"result": "green"' "$st/done-reviewer.json"; then final "Done: build a website; the reviewer's run of the verification command is green"
+else final "Not done: build a website; the reviewer's run is red"; fi
