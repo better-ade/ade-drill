@@ -180,15 +180,16 @@ def panel(lines, height=ROWS - 1):
     """rows of text as a screen (the newest at the bottom when there are more than fit)"""
     out = []
     for l in lines:
-        for w in wrap(l, COLS - 1) if "\x1b" not in l else [l]: out.append(w)
+        for w in wrap(l, COLS - 1) if "\x1b" not in l and len(l) > COLS - 1 else [l]: out.append(w)
     return CLEAR + "\x1b[?25l" + "\r\n".join(out[-height:])
 
 
 def columns(left, right, gap=2):
-    """two texts side by side, each wrapped to half the screen"""
-    w = (COLS - gap) // 2
-    a = [x for l in left for x in wrap(l, w)]; b = [x for l in right for x in wrap(l, w)]
-    return [(a[i] if i < len(a) else "").ljust(w + gap) + (b[i] if i < len(b) else "") for i in range(max(len(a), len(b)))]
+    """two texts side by side, each wrapped to its half of the screen (a wrapped line goes on indented)"""
+    w = (COLS - 1 - gap) // 2
+    def fit(lines): return [x if i == 0 else "  " + x for l in lines for i, x in enumerate(wrap(l, w) if len(l) <= w else [wrap(l, w)[0]] + wrap(" ".join(wrap(l, w)[1:]), w - 2))]
+    a, b = fit(left), fit(right)
+    return [((a[i] if i < len(a) else "").ljust(w + gap) + (b[i] if i < len(b) else "")).rstrip() for i in range(max(len(a), len(b)))]
 
 
 def head(text): return "\x1b[1;36m" + text[:COLS] + "\x1b[0m"
@@ -215,7 +216,7 @@ def stages(segs, put, after, work, team):
         (ln, lt), (rn, rt) = files
         cols = columns(["frontend: " + ln, "-" * 10] + lt.rstrip("\n").split("\n"), ["backend: " + rn, "-" * 10] + rt.rstrip("\n").split("\n"))
         timing = put(work.get("timing") or "")
-        lines_in(STAGE_TIME["dev"], cols + ([""] + [head(timing)] if timing else []), c, 0.15)
+        lines_in(STAGE_TIME["dev"], cols + (["", timing] if timing else []), c, 0.15)
     c = next(caps); changes = [(put(a), put(b)) for a, b in (work.get("changes") or [])]
     if changes:
         ls = [head("~/Project/website after the run, as git sees it")]

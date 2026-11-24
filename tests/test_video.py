@@ -139,7 +139,7 @@ WORK = {"design": "# Architecture\n\nA one-page website.\n\n## Verification comm
                 "assign: frontend: ade work --role builder --name website-frontend projects/website",
                 "assign: backend: ade work --role builder --name website-backend projects/website",
                 "assign: reviewer: ade work --role reviewer --name website-reviewer projects/website"],
-        "files": [("index.html", "<!doctype html>\n<h1>Hello</h1>\n"), ("server.js", "Bun.serve({ port })\n")],
+        "files": [("index.html", "<!doctype html>\n<h1>Hello</h1>\n"), ("server.js", "const port = Number(process.env.PORT || 3000);\nBun.serve({ port, hostname: \"127.0.0.1\", fetch(req) { return new Response(\"ok\") } });\n")],
         "timing": "frontend 3.4-5.5 s, backend 3.6-5.7 s after the ask: together",
         "changes": [("git status --short", "?? docs/\n?? index.html\n?? server.js\n?? tests/"), ("git log --oneline", "1a2b3c4 website")],
         "review": {"cmd": "bash tests/verify.sh", "out": "green: index.html is there, /api/health answers ok", "result": "green"}}
@@ -177,6 +177,10 @@ class Stages(unittest.TestCase):
         dev = text("Development:")
         both = [l for l in dev.split("\n") if "index.html" in l and "server.js" in l]
         self.assertTrue(both, "frontend and backend side by side"); self.assertIn("Bun.serve", dev); self.assertIn("together", dev)
+        rows = dev.split("\n")
+        self.assertTrue(any(l.startswith("<!doctype") and "const port" in l for l in rows), "the long lines stay in their column")
+        self.assertFalse(any(l.startswith(("Bun.serve", "const port", "fetch")) for l in rows), "backend's code never in the left column")
+        self.assertIn(WORK["timing"], dev.replace("\n", " "))   # the measured times, whole
         ch = text("Changes:")
         self.assertIn("$ git status --short", ch); self.assertIn("?? index.html", ch); self.assertIn("1a2b3c4 website", ch)
         self.assertNotRegex(ch.replace("no PR", ""), r"(?i)pull request|\bPR\b|merged")
