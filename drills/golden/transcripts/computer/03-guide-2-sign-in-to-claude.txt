@@ -1,0 +1,11 @@
+Step 2 of 6: Sign in to Claude
+Claude Code works with your Claude account or with an API key. The account
+sign-in is Claude Code's own, in your browser; ade stores nothing.
+  1) account  your Claude account (Pro, Max, Team or Enterprise)
+  2) key      an API key, which you will be asked for at step 4
+How do you use Claude? [account]: account
+Opening your browser to sign in (stand-in: no browser, no account)...
+
+Login successful.
+
+checked: signed in to Claude (account)

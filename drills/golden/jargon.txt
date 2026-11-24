@@ -1,0 +1,30 @@
+# Words a new person may not know, one per line. The first-run report lists each one whose first line on the screen
+# does not say what it is. Lower-case words match any case; others match as written.
+hub
+orchestrator
+everything agent
+main agent
+focus agent
+allowlist
+PATH
+tmux
+key store
+plugin
+bun
+repository
+API key
+live check
+live test
+auto mode
+session
+pairing code
+token
+persona
+workspace
+tab
+gitleaks
+bin/sync
+bin/chat
+hub.conf
+Remote Control
+verification command

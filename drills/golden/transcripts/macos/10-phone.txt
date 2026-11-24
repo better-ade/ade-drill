@@ -1,0 +1,13 @@
+you: hello
+your bot: Pairing required — run in Claude Code:
+
+    /telegram:access pair <code>
+your bot: Paired! Say hi to Claude.
+your bot: Test from the drill-hub hub: reply to this message with anything within 30 seconds.
+you: got it
+your bot: restarted, 0 agents running, 0 waiting
+your bot: your chat now runs in auto mode: your bot is locked to you, so your main agent acts on your Telegram messages without asking at the terminal; Claude Code's auto mode still refuses risky actions. HUB_CHAT_MODE=manual in hub.conf turns it off
+another account: fix everything
+you: fix the failing test in calc: add() subtracts
+your bot: Done: fix the failing test in calc: add() subtracts (calc). The reviewer ran python3 -m unittest discover -s tests and it passes.
+your bot: [a picture]

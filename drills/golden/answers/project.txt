@@ -1,0 +1,3 @@
+# The person at the terminal of `ade project add ~/Project/calc`. Each line: the text to wait for, a tab, what to type.
+copy the ADE method into it	n
+start focus agents on them now?	n

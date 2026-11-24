@@ -1,0 +1,49 @@
+Step 4 of 6: Your hub
+Your hub is where ADE keeps its memory: a folder in ~/hubs, saved in a private
+repository on your GitHub. ADE sets it up, then you pick its agents.
+Name for your hub (lower-case letters, digits and -, e.g. acme-sre): drill-hub
+https://github.com/drill-owner/drill-hub
+hub drill-hub created in ~/hubs/drill-hub
+The kind of teammate this hub's main agent acts as (pick the closest):
+  1) data-engineer              Data Engineer
+  2) devops-sre                 DevOps / Site Reliability Engineer
+  3) engineering-manager        Engineering Manager
+  4) fractional-cto             Fractional CTO
+  5) frontend-engineer          Frontend Engineer
+  6) ml-ai-engineer             ML / AI Engineer
+  7) mobile-engineer            Mobile Engineer
+  8) qa-test-engineer           QA / Test Engineer
+  9) security-engineer          Security Engineer
+  10) solutions-architect        Solutions Architect
+  11) staff-software-engineer    Staff Software Engineer
+  12) tech-lead                  Tech Lead
+  13) technical-product-manager  Technical Product Manager
+Kind of teammate (1-13): 1
+Who this hub works for (a client or your team; shown in the hub): Drill
+Owner (your name, as it should appear in the hub): Drill Owner
+initialized drill-hub (Data Engineer for Drill) at /home/ade/hubs/drill-hub
+next: cd /home/ade/hubs/drill-hub && bin/setup && bin/brain index && bin/doctor, then start claude there
+Saving the hub's first version to your private GitHub repository (bin/sync):
+synced: <commit> sync <date> <time>
+default hub: ~/hubs/drill-hub
+Your everything agent (the orchestrator) is the one agent you talk to; it hands
+work to the others. Pick the AI service it uses (one; later: ade setup --top):
+  1) claude-account  Claude account in Claude Code (Pro, Max, Team, Enterprise)
+  2) anthropic-key   Anthropic API key in Claude Code
+  3) deepseek        DeepSeek
+  4) glm             GLM (needs the live check)
+  5) muse            Muse (needs the live check)
+Pick one (1-5): claude-account
+anthropic: ready (Ns)
+everything agent: anthropic
+Your focus agents each do one piece of work. Pick the AI services they may use;
+each one is signed in and tried once, so you know it works:
+  1) anthropic  Claude Code
+  2) gemini     Gemini (Gemini CLI)
+  3) deepseek   DeepSeek
+  4) glm        GLM (needs the live check)
+  5) muse       Muse (needs the live check)
+Pick any (numbers or names, spaces between; Enter for none): anthropic
+anthropic: ready (tested above)
+AI services your agents use: anthropic (change it later; ade roles shows it)
+checked: your hub is drill-hub (~/hubs/drill-hub)

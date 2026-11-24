@@ -1,0 +1,4 @@
+#!/bin/bash
+# A guard, not a stand-in: the drill must never reach this machine's key stores, clipboard or job scheduler (security,
+# launchctl, pass, gpg, pbcopy, pbpaste, xclip, wl-copy are links to this file). A call is recorded and is a failure.
+echo "$(basename "$0") $*" >> "${DRILL_GUARD:-/dev/null}"; echo "drill guard: $(basename "$0") must not be called" >&2; exit 97
