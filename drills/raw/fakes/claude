@@ -1,0 +1,5 @@
+#!/bin/bash
+# What the stand-in installer of Claude Code puts in ~/.local/bin/claude on the raw targets: the golden drill's
+# Claude Code stand-in, run by the drill's own Python (the person's machine may have no python3; the drill brings none
+# onto the person's PATH). Paths are the drill container's mounts (drills/raw-ubuntu.sh).
+exec /opt/drill/python/bin/python3 -I /drill/drills/golden/fakes/claude "$@"

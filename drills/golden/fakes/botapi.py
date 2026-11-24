@@ -14,8 +14,15 @@ The Bot API side (the token in the path must be the one given, else 401, as Tele
 The phone side (the drill plays the owner; never part of Telegram's API):
   POST /phone/say          JSON {"text": ..., "from": <id, default the owner>}: the owner (or a stranger) writes to the bot
   The owner answers a message that starts with "Test from the" by itself (the hub's bin/chat test waits for a reply).
+Every Bot API method called is appended to <state folder>/methods.log (its name only).
+
+Relay (story D4, the real-bot mode): with DRILL_TG_RELAY_TOKEN and DRILL_TG_RELAY_CHAT in the environment, everything
+the bot sends to the owner is also sent, as it is, to that chat through the real Bot API (DRILL_TG_RELAY_API, default
+https://api.telegram.org), and the row records "relayed": "ok" or why not. Only sendMessage, sendPhoto and
+sendDocument are relayed: the relay never calls getUpdates or setWebhook, so a hub live on the same bot keeps its
+messages. The real token is read once, taken out of the environment, and never written anywhere.
 """
-import json, os, sys, threading, time, urllib.parse
+import json, os, secrets, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 STATE, TOKEN, OWNER = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -24,6 +31,33 @@ LOCK = threading.Condition()
 UPDATES = []          # queued updates, oldest first
 NEXT = [1000]         # the next update_id
 MSG = [1]
+RELAY_TOKEN = os.environ.pop("DRILL_TG_RELAY_TOKEN", ""); RELAY_CHAT = os.environ.pop("DRILL_TG_RELAY_CHAT", "")
+RELAY_API = os.environ.pop("DRILL_TG_RELAY_API", "") or "https://api.telegram.org"
+RELAYED = ("sendMessage", "sendPhoto", "sendDocument")
+
+
+def relay(method, p, names):
+    """the same message to the real chat: "ok", or why not (never the token: Telegram's own description at most)"""
+    if method not in RELAYED: return "not relayed: %s" % method
+    url = "%s/bot%s/%s" % (RELAY_API, RELAY_TOKEN, method)
+    if method == "sendMessage":
+        body = json.dumps({"chat_id": RELAY_CHAT, "text": str(p.get("text", ""))[:4096]}).encode(); ctype = "application/json"
+    else:
+        kind = "photo" if method == "sendPhoto" else "document"; b = "drill" + secrets.token_hex(8)
+        parts = [("chat_id", None, RELAY_CHAT.encode()), ("caption", None, str(p.get("caption", "")).encode()),
+                 (kind, names.get(kind, kind), p.get(kind) if isinstance(p.get(kind), bytes) else b"")]
+        body = b"".join(b"--%s\r\nContent-Disposition: form-data; name=\"%s\"%s\r\n\r\n%s\r\n" % (
+            b.encode(), n.encode(), (b'; filename="%s"' % os.path.basename(f).encode()) if f else b"", v) for n, f, v in parts) + b"--%s--\r\n" % b.encode()
+        ctype = "multipart/form-data; boundary=" + b
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=body, headers={"Content-Type": ctype}), timeout=20) as r:
+            return "ok" if json.load(r).get("ok") else "failed: not ok"
+    except urllib.error.HTTPError as e:
+        try: why = str(json.load(e).get("description", ""))[:120]
+        except ValueError: why = ""
+        return "failed: %d %s" % (e.code, why.replace(RELAY_TOKEN, "<token>") if RELAY_TOKEN else why)
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return "failed: %s" % e.__class__.__name__
 
 
 def record(row, name="sent.jsonl"):
@@ -91,6 +125,7 @@ class H(BaseHTTPRequestHandler):
         if not path.startswith("/bot"): return self.reply(404, {"ok": False, "description": "Not Found"})
         token, _, method = path[4:].partition("/")
         if token != TOKEN: return self.reply(401, {"ok": False, "error_code": 401, "description": "Unauthorized"})
+        with open(os.path.join(STATE, "methods.log"), "a") as f: f.write(method + "\n")
         if method == "getUpdates":
             off = int(p.get("offset") or 0); wait = min(float(p.get("timeout") or 0), 2.0); end = time.time() + wait
             with LOCK:
@@ -108,6 +143,7 @@ class H(BaseHTTPRequestHandler):
             name = "%d-%s" % (int(time.time() * 1000), os.path.basename(names.get(kind, kind)))
             with open(os.path.join(STATE, "files", name), "wb") as f: f.write(data)
             row.update(file=name, bytes=len(data), png=data[:8] == b"\x89PNG\r\n\x1a\n", caption=str(p.get("caption", "")))
+        if RELAY_TOKEN and RELAY_CHAT and row["chat_id"] == OWNER: row["relayed"] = relay(method, p, names)
         record(row)
         if row["chat_id"] == OWNER:   # what the owner's phone shows
             record({"who": "your bot", "text": row.get("text") or "[a picture] " + row.get("caption", ""), "buttons": row.get("buttons", False)}, "phone.jsonl")

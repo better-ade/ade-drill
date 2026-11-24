@@ -17,6 +17,10 @@
     { "name": "project", "os": "macos-latest" },
     { "name": "golden",  "os": "ubuntu-latest", "setup": "bash drills/golden/ci-tools.sh" },
     { "name": "golden",  "os": "macos-latest",  "setup": "bash drills/golden/ci-tools.sh" },
-    { "name": "golden",  "os": "ubuntu-latest", "ade": "main", "setup": "bash drills/golden/ci-tools.sh chromium" }
+    { "name": "golden",  "os": "ubuntu-latest", "ade": "main", "setup": "bash drills/golden/ci-tools.sh chromium" },
+    { "name": "raw-ubuntu", "os": "ubuntu-latest", "target": "server" },
+    { "name": "raw-ubuntu", "os": "ubuntu-latest", "target": "desktop" },
+    { "name": "raw-ubuntu", "os": "ubuntu-latest", "target": "server", "ade": "main" },
+    { "name": "raw-ubuntu", "os": "ubuntu-latest", "target": "desktop", "ade": "main" }
   ]
 }

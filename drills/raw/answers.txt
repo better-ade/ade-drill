@@ -1,0 +1,30 @@
+# The person at the terminal (story D4): one rule per line, tab-separated: a regex on the prompt (the screen's last line),
+# then, when it starts with ~, a regex on the screen since the last answer, then what to do, in order (see run.py:
+# converse): text is typed, @enter is the Enter key, @hub and @token the hub's name and the stand-in bot token, @stop
+# picks "stop" in ade's failure menu (the person then follows what the screen says), @pick:<word> types the number
+# shown next to that word, and @second-terminal, @message-the-bot, @lock are what the guide sends the person away to do.
+# The first rule that matches wins.
+^Install (\S+ )*(bat|poppler-utils|chafa)( \S+)* now\?	n
+Claude Code is not installed\. Install it now\?	y
+^Install .* now\? .*\[[yY]/[nN]\]$	y
+Set up now\?	y
+How do you use Claude\?	account
+Open the GitHub address in this computer's browser\?	y
+Press Enter to open github\.com	@enter
+Name for your hub	@hub
+Kind of teammate	1
+Who this hub works for	Drill
+Owner \(your name	Drill Owner
+^Pick one	claude-account
+^Pick any	anthropic
+Do you want to reach your main agent from Telegram\?	y
+Bot token \(hidden	@token
+Press Enter when done	~open a second terminal	@second-terminal	@enter
+Press Enter when done	~send your bot any message	@message-the-bot	@enter
+Press Enter when done	~policy allowlist	@lock	@enter
+^What now\?	@stop
+Geographic area:	~\bEtc\b	@pick:Etc
+Time zone:	~\bUTC\b	@pick:UTC
+Do you want to continue\? \[Y/n\]	y
+# a yes/no question the rules do not know: its default (Enter), recorded in the report as asked
+\[[yY]/[nN]\]$	@enter
