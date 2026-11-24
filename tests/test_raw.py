@@ -120,18 +120,37 @@ class Prompts(unittest.TestCase):
         self.assertEqual([x["after_telegram"] for x in p], [False, False, True, True])
 
 
-class Spawn(unittest.TestCase):
-    def test_spawn_summary_checks_folders_reports_and_overlap(self):
-        home = "/home/you"; names = ["svc-%d" % i for i in range(1, 6)]
-        ups = {n: {"t": 100.0 + i, "cwd": "%s/Project/%s" % (home, n), "saw": 5} for i, n in enumerate(names)}
-        reports = [(110.0 + i, "[%s] note: \"up in ~/Project/%s; 5 of 5 running together\"" % (n, n)) for i, n in enumerate(names)]
-        s = flow.spawn_summary(names, ups, reports, home, 99.0)
-        self.assertTrue(s["ok"], s["problems"]); self.assertEqual(s["all_up"], 5.0)
-        ups["svc-2"]["cwd"] = home + "/hubs/h"; ups["svc-3"]["saw"] = 1; del ups["svc-5"]
-        s = flow.spawn_summary(names, ups, reports[:3], home, 99.0)
-        self.assertFalse(s["ok"]); self.assertIsNone(s["all_up"])
-        text = " | ".join(s["problems"])
-        for want in ("svc-2 runs in /home/you/hubs/h, not its own checkout", "svc-3 saw 1 of 5", "svc-5 never started", "svc-4: no report reached the chat"):
+class Team(unittest.TestCase):
+    def good(self):
+        home = "/home/you"; cwd = home + "/Project/website"
+        src = {"architect": "ade-method", "frontend": "ade-agent-registry", "backend": "ade-agent-registry", "reviewer": "ade-method"}
+        hub = {"architect": "architect", "frontend": "builder", "backend": "builder", "reviewer": "reviewer"}
+        times = {"architect": (101.0, 103.0), "frontend": (104.0, 106.0), "backend": (104.5, 105.5), "reviewer": (107.0, 109.0)}
+        assigns = {r: {"t": times[r][0] - 0.5, "hub_role": hub[r], "persona": ".ade/agents/%s.md" % r, "source": src[r]} for r in flow.ROLES}
+        dones = {r: {"t_up": times[r][0], "t_done": times[r][1], "cwd": cwd, "persona": "# " + r.title(), "result": "ok",
+                     "text": "%s: done" % r} for r in flow.ROLES}
+        dones["reviewer"]["result"] = "green"
+        reports = [(times[r][1] + 0.2, '[website-%s] note: "%s: done"' % (r, r)) for r in flow.ROLES]
+        return assigns, dones, reports, (110.0, "Done: build a website; the reviewer's run is green")
+
+    def test_team_summary_checks_roles_order_reports_and_done(self):
+        assigns, dones, reports, done = self.good()
+        s = flow.team_summary(assigns, dones, reports, 100.0, done)
+        self.assertTrue(s["ok"], s["problems"]); self.assertEqual(s["all_up"], 7.0); self.assertEqual(s["done_after"], 10.0)
+        self.assertTrue(s["parallel"])
+        self.assertIn("the hub has no frontend role (bin/roles): assigned as builder with .ade/agents/frontend.md", s["findings"])
+        self.assertEqual([r[0] for r in s["rows"]], flow.ROLES)
+
+    def test_team_summary_names_each_problem(self):
+        assigns, dones, reports, done = self.good()
+        dones["frontend"]["t_up"] = 102.0                  # before the architect's handoff
+        dones["backend"]["persona"] = ""                   # the role file was not there
+        dones["reviewer"]["result"] = "red"                 # and Done anyway
+        del dones["architect"]["t_done"]; reports = reports[1:]
+        s = flow.team_summary(assigns, dones, reports, 100.0, done)
+        self.assertFalse(s["ok"]); text = " | ".join(s["problems"])
+        for want in ("architect never finished", "frontend started before the architect's handoff", "backend: no role file .ade/agents/backend.md (ade-agent-registry)",
+                     "architect: no report reached the chat", "the reviewer's run is red", "Done was sent without the reviewer's green run"):
             self.assertIn(want, text)
         self.assertEqual(flow.peak([(1, 1000, 10), (2, 5000, 31), (3, 3000, 40)]), (5000, 40))
 
@@ -148,18 +167,20 @@ class Report(unittest.TestCase):
         self.assertEqual(rows, [("install", "/usr/bin/apt-get install -y curl"), ("guide", "/usr/bin/apt-get install -y git tmux")])
 
     def test_report_lists_every_finding(self):
-        steps = [("ok", "install", "ade 0.2.8", 3.0), ("FAIL", "spawn: five focus agents", "svc-5 never started", 60.0)]
+        steps = [("ok", "install", "ade 0.2.8", 3.0), ("FAIL", "team: build a website", "reviewer never started", 60.0)]
         screens = [("01-install", "bash: line 1: curl: command not found\n", 1.0)]
         prompts = [{"screen": "guide", "question": "Install git now? [y/N]", "answer": "y", "after_telegram": False},
                    {"screen": "guide", "question": "Press Enter when done", "answer": "@enter", "after_telegram": True}]
         missing = [("curl", "command not found", "bash: line 1: curl: command not found", "install", "fixed: sudo apt-get install -y curl (no advice on the screen)")]
         fixes = [("install", "no advice on the screen: curl: command not found", "sudo apt-get install -y curl", "unadvised")]
-        spawn = {"ok": False, "all_up": None, "problems": ["svc-5 never started"], "rows": [("svc-1", 1.0, "/home/you/Project/svc-1", 5, "[svc-1] up")]}
+        spawn = {"ok": False, "all_up": None, "done_after": None, "parallel": False, "problems": ["reviewer never started"],
+                 "findings": ["the hub has no frontend role (bin/roles): assigned as builder with .ade/agents/frontend.md"],
+                 "rows": [("architect", "ade-method", "architect", "# Architect", 1.0, 3.0, "/home/you/Project/website", "ok", "[website-architect] note: up")]}
         r = flow.report("server", "ade 0.2.8", steps, screens, prompts, missing, fixes, [("install", "/usr/bin/apt-get install -y curl")],
                         spawn, (204800, 77), "Telegram: stand-in both ways")
         for want in ("# User-flow report: raw Ubuntu server", "| curl | command not found | install |", "fixed: sudo apt-get install -y curl",
                      "| guide | Press Enter when done | @enter | yes: terminal-only after Telegram |", "| install | `/usr/bin/apt-get install -y curl` |",
-                     "| install | 3.0 |", "svc-5 never started", "200 MB", "| 77 |", "Telegram: stand-in both ways", "01-install", "| Terminal-only prompts after Telegram | 1 |"):
+                     "| install | 3.0 |", "reviewer never started", "| architect | ade-method | architect | # Architect | 1.0 | 3.0 |", "the hub has no frontend role", "200 MB", "| 77 |", "Telegram: stand-in both ways", "01-install", "| Terminal-only prompts after Telegram | 1 |"):
             self.assertIn(want, r)
 
 
@@ -177,7 +198,7 @@ class Relay(unittest.TestCase):
                 return "http://127.0.0.1:" + open(os.path.join(state, "port")).read().strip()
             upstream = start(up, real, "777", dict(os.environ))   # plays the real Bot API
             env = dict(os.environ, DRILL_TG_RELAY_TOKEN=real, DRILL_TG_RELAY_CHAT="777", DRILL_TG_RELAY_API=upstream,
-                       DRILL_TG_RELAY_MATCH=r"^\[svc-\d+\] note:", DRILL_TG_RELAY_MAX="2")
+                       DRILL_TG_RELAY_MATCH=r"\] note: \"?(architect|frontend): ", DRILL_TG_RELAY_MAX="2")
             api = start(me, standin, "42", env)
             def call(path, body):
                 req = urllib.request.Request(api + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
@@ -185,10 +206,10 @@ class Relay(unittest.TestCase):
             call("/phone/say", {"text": "start 5 focus agents"})
             self.assertEqual(call("/bot%s/getUpdates" % standin, {"timeout": 0})["result"][0]["message"]["text"], "start 5 focus agents")
             # only what matches goes to the real chat, and at most the cap (a handful of messages a run)
-            for text in ("Pairing required", "[svc-1] note: up", "[svc-2] idle: waiting", "[svc-2] note: up", "[svc-3] note: up"):
+            for text in ("Pairing required", '[w-a] note: "architect: up"', "[w-f] idle: waiting", '[w-f] note: "frontend: up"', '[w-a] note: "architect: again"'):
                 self.assertTrue(call("/bot%s/sendMessage" % standin, {"chat_id": "42", "text": text})["ok"])
             got = [json.loads(l) for l in open(os.path.join(up, "sent.jsonl"))]
-            self.assertEqual([(g["method"], g["chat_id"], g["text"]) for g in got], [("sendMessage", "777", "[svc-1] note: up"), ("sendMessage", "777", "[svc-2] note: up")])
+            self.assertEqual([(g["method"], g["chat_id"], g["text"]) for g in got], [("sendMessage", "777", '[w-a] note: "architect: up"'), ("sendMessage", "777", '[w-f] note: "frontend: up"')])
             self.assertEqual([l.split()[0] for l in open(os.path.join(up, "methods.log"))], ["sendMessage"] * 2)   # never getUpdates
             mine = open(os.path.join(me, "sent.jsonl")).read()
             self.assertEqual(mine.count('"relayed": "ok"'), 2)

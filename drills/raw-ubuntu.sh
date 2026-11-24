@@ -1,6 +1,6 @@
 #!/bin/bash
 # Drill: the ade-cli README's user flow on a raw Ubuntu server or desktop (story D4): Claude Code, the Telegram bot,
-# then five focus agents from one Telegram message, with a stand-in for every account. Each target is a fresh
+# then "build a website" from one Telegram message, four roles, with a stand-in for every account. Each target is a fresh
 # ubuntu:24.04 container of its own, thrown away afterwards; drills/raw/run.py is the person inside it.
 #   RAW_TARGET=server  bash drills/raw-ubuntu.sh   ubuntu:24.04 as published, plus sudo and a normal user (the default)
 #   RAW_TARGET=desktop bash drills/raw-ubuntu.sh   plus what Ubuntu Desktop 24.04 ships that matters here, and Xvfb
@@ -27,15 +27,13 @@ if [ ! -x "$cache/python/bin/python3" ]; then
 fi
 
 # what the person already has, prepared here (the container has no git yet): the hub template the stand-in GitHub
-# copies, the person's five repos, and the README the flow is read from
+# copies, the person's scratch website repo, and the README the flow is read from
 data="$(mktemp -d "${TMPDIR:-/tmp}/ade-raw-data.XXXXXX")" || exit 1; trap 'rm -rf "$data"' EXIT
 git clone -q --depth 1 --branch "${GOLDEN_BRAIN_REF:-main}" https://github.com/better-ade/ade-brain "$data/ade-brain" || { echo "DRILL FAIL: could not clone ade-brain" >&2; exit 1; }
 readme_ref="${GOLDEN_ADE_REF:-main}"
 curl -fsSL --retry 3 -o "$data/README.md" "https://raw.githubusercontent.com/better-ade/ade-cli/$readme_ref/README.md" || { echo "DRILL FAIL: could not read ade-cli's README at $readme_ref" >&2; exit 1; }
-for i in 1 2 3 4 5; do
-  r="$data/repos/svc-$i"; mkdir -p "$r" && printf '# svc-%s\n\nOne of the five repos the person already has.\n' "$i" > "$r/README.md"
-  git -C "$r" init -q -b main && git -C "$r" add -A && git -C "$r" -c user.name=Someone -c user.email=someone@example.invalid commit -q -m "svc-$i" || exit 1
-done
+r="$data/repos/website"; mkdir -p "$r" && printf '# website\n\nA scratch repo the person wants a website in.\n' > "$r/README.md"
+git -C "$r" init -q -b main && git -C "$r" add -A && git -C "$r" -c user.name=Someone -c user.email=someone@example.invalid commit -q -m website || exit 1
 chmod -R a+rX "$data"
 
 # the image: ubuntu:24.04, the person `you` in the sudo group (as an installer's first user is) with password-less sudo (every use logged), the apt hook for the stand-ins

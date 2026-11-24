@@ -16,10 +16,16 @@ Verification command: `bash tests/run.sh`. The drill itself: `RAW_TARGET=server|
    and signed in (stand-in sign-in, as in D3).
 2. **Telegram**: the same guide connects the bot (the D3 stand-in token and Bot API). From here on the person acts only
    from Telegram: every prompt answered at a terminal after the bot token is a finding.
-3. **Five focus agents, from Telegram**: one message to the bot asks the main agent for five focus agents, one per repo
-   the person already has (`~/Project/svc-1` to `svc-5`). The scripted main agent uses what the hub has for it
-   (`ade project add`, which the README names for repos you already have, then `ade work --prompt`); each stand-in focus
-   agent reports through the hub's own path (`bin/notify` to main, which `bin/chat forward` sends to the chat).
+3. **Build a website, four roles, from Telegram** (owner's scope, 2026-11-24, replacing five generic agents): one message,
+   "build a website", to the bot. The main agent (the hub's Telegram session: the coordinator, counted apart from the
+   four) loads the scratch repo the person has (`~/Project/website`) with `ade project add`, the core roles with
+   `ade init` (ade-method) and frontend and backend with `ade agent add` (ade-agent-registry); a role missing there is a
+   finding. It shows the hub's ticket dispatch (`bin/dispatch --list`) and assigns each role with the hub's own start,
+   `ade work --role <hub role>` (a role `bin/roles` does not have runs as builder with its role file: a finding), in
+   order: the architect (a short note and the verification command: `index.html` is there and `/api/health` answers);
+   then frontend (`index.html`) and backend (a tiny Bun server), which may run at the same time; then the reviewer, who
+   runs the verification command. Each role reports through the hub's own path (`ade notify main`, which the hub's chat
+   forwarder sends to the chat). Done comes only from the reviewer's green run.
 `ade hub new` runs inside the guide (its step 4), so the flow needs no separate call.
 
 A friction is a finding, not something to work around. The drill installs nothing the README does not tell the person
@@ -48,14 +54,16 @@ the stand-in's); the systemd stand-in (a container has no systemd).
 ## The report (`report.md` per target, uploaded as an artifact with the transcripts)
 Each step's screen (the D3 recorder), every missing tool and how it was found (installed by the guide, fixed by the
 person from the screen's advice, or the step failed), every prompt with its answer and whether it was terminal-only
-(after the bot token: a Telegram-first finding), every sudo use with its step, the time per step, and for the five
-agents: time from the message to all five up, peak memory and process count of the person's processes, each agent's
-folder and its report on the phone.
+(after the bot token: a Telegram-first finding), every sudo use with its step, the time per step, and for the four
+roles: where each role file came from, the hub role it ran as, time from the message to each up and done, to all four
+up and to Done, whether frontend and backend overlapped, peak memory and process count of the person's processes,
+each role's folder, result and report on the phone.
 
 ## Real-bot mode
-With the Actions secrets `ADE_DRILL_TELEGRAM_TOKEN` and `ADE_DRILL_TELEGRAM_CHAT` (only on push and schedule in
-better-ade/ade-drill, never a pull request), the stand-in Bot API relays everything the bot sends (the guide's test,
-each agent's report) to the real Bot API, to that chat. The hub and ade only ever hold the stand-in token; the real one
+With the Actions secrets `ADE_DRILL_TELEGRAM_TOKEN` and `ADE_DRILL_TELEGRAM_CHAT` (on push to main, on schedule
+and on a workflow_dispatch in better-ade/ade-drill, never a pull request; one job only: server on ade main), the stand-in
+Bot API relays a handful of what the bot sends to the real Bot API, to that chat: the guide's connect test, one line
+per role and the Done (`DRILL_TG_RELAY_MATCH`, at most `DRILL_TG_RELAY_MAX`=6 a run). The hub and ade only ever hold the stand-in token; the real one
 lives in the relay's environment, masked in the log, in no file, report or artifact. What the person sends still comes
 through the stand-in update feed (a bot cannot send itself a person's message), and the relay never calls `getUpdates`
 or `setWebhook` (a hub live on the same bot keeps its messages). The report says which half was real.
@@ -66,9 +74,9 @@ or `setWebhook` (a hub live on the same bot keeps its messages). The report says
 | 1 | Outcome 1: the install line and the guide's commands are copied from the README at run time; a README without them fails the drill | `test_readme_steps_are_read_from_the_readme`, `test_readme_without_the_install_line_fails` |
 | 2 | Outcome 1: every missing tool is found from the screen and recorded with how it was found and what the person did | `test_missing_tools_are_found_on_the_screen`, `test_fix_follows_the_screen_advice_only` |
 | 3 | Outcome 2: every prompt is recorded with its answer; one answered at a terminal after the bot token is a Telegram-first finding | `test_prompts_after_the_bot_token_are_findings`, `test_answers_pick_by_screen_and_context` |
-| 4 | Outcome 3: five focus agents, each in its own checkout, each reporting to the chat, none waiting for another; time to all five up, peak memory and process count | `test_spawn_summary_checks_folders_reports_and_overlap` |
-| 5 | The report has the screens, missing tools, prompts, sudo uses with their step, time per step and the spawn figures | `test_report_lists_every_finding`, `test_sudo_log_is_read_per_step` |
-| 6 | Real-bot mode relays what the bot sends to the real chat, never polls the real token, and the token is in no record | `test_relay_sends_to_the_real_chat_and_never_polls` |
+| 4 | Outcome 3: four roles from their real sources, assigned in order (architect; frontend and backend; reviewer), each reporting to the chat, Done only on the reviewer's green run; time to all up and to Done, peak memory and process count | `test_team_summary_checks_roles_order_reports_and_done`, `test_team_summary_names_each_problem` |
+| 5 | The report has the screens, missing tools, prompts, sudo uses with their step, time per step and the team figures | `test_report_lists_every_finding`, `test_sudo_log_is_read_per_step` |
+| 6 | Real-bot mode relays only the matching messages, up to the cap, to the real chat, never polls the real token, and the token is in no record | `test_relay_sends_to_the_real_chat_and_never_polls` |
 | 7 | CI runs both targets on the ade release and on ade main, on pull requests and nightly, and uploads each report | `.github/workflows/ci.yml`, `nightly.yml`, `drills/matrix.json` (checked by `tests/run.sh`) |
 
 ## Out of scope

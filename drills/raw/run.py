@@ -2,8 +2,8 @@
 """The raw-Ubuntu drill (story D4): the ade-cli README's user flow on a fresh ubuntu:24.04, as a person types it.
 
   the README's install line -> ade help, ade version -> ade setup until Claude Code is installed and signed in ->
-  the guide connects the Telegram bot -> from Telegram: "start 5 focus agents" -> five agents, each in its own
-  checkout, each reporting to the chat
+  the guide connects the Telegram bot -> from Telegram: "build a website" -> the main agent assigns four roles
+  (architect; frontend and backend; reviewer), each reporting to the chat; Done only on the reviewer's green run
 
 Runs inside the drill's container as the person (`you`, password-less sudo), started by drills/raw-ubuntu.sh, with the
 drill's own Python (/opt/drill/python, never on the person's PATH). It reuses the golden drill (D3): its terminal, its
@@ -14,7 +14,7 @@ screen says once (or installs the missing command the way a person would) and tr
   RAW_TARGET       server | desktop (the image drills/raw-ubuntu.sh built)
   GOLDEN_ADE_REF   empty: the release, by the README's one-line install; a branch (main): the README's git clone line
   GOLDEN_OUT       where report.md and transcripts/ go (default /out)
-  RAW_DATA         the drill's prepared data, read-only: ade-brain/ (the hub template) and repos/svc-1..5
+  RAW_DATA         the drill's prepared data, read-only: ade-brain/ (the hub template) and repos/website
   ADE_DRILL_TELEGRAM_TOKEN, ADE_DRILL_TELEGRAM_CHAT   the real-bot mode: what the bot sends also goes to that chat
                    (only the Bot API stand-in ever holds the token; it is in no file, screen or report)
 
@@ -37,8 +37,7 @@ TARGET = os.environ.get("RAW_TARGET", "server")
 ADE_REF = os.environ.get("GOLDEN_ADE_REF", "")
 DATA = os.environ.get("RAW_DATA", "/drill-data")
 OUT = g.OUT
-NAMES = ["svc-%d" % i for i in range(1, 6)]
-ASK = "start 5 focus agents, one per repo: " + " ".join(NAMES)
+ASK = "build a website"   # the owner's task, sent from Telegram: four roles build it (flow.ROLES)
 SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 PROMPT_END = re.compile(r"(\?|:|\]|\)|\.\.\.)$")
 
@@ -163,8 +162,8 @@ class Raw(g.Drill):
     # ---- the flow ----
     def prepare(self):
         env = dict(os.environ)
-        if REAL_TOKEN and REAL_CHAT:   # a handful of real messages a run: the guide's connect check, one line per agent
-            env.update(DRILL_TG_RELAY_TOKEN=REAL_TOKEN, DRILL_TG_RELAY_CHAT=REAL_CHAT, DRILL_TG_RELAY_MATCH=r"^(Test from the|\[svc-[0-9]+\] note: )", DRILL_TG_RELAY_MAX="6")
+        if REAL_TOKEN and REAL_CHAT:   # a handful of real messages a run: the guide's connect check, one line per role, the Done
+            env.update(DRILL_TG_RELAY_TOKEN=REAL_TOKEN, DRILL_TG_RELAY_CHAT=REAL_CHAT, DRILL_TG_RELAY_MATCH=r'^(Test from the|Done: |.*\] note: "?(architect|frontend|backend|reviewer): )', DRILL_TG_RELAY_MAX="6")
         self.botapi = subprocess.Popen([sys.executable, "-I", os.path.join(GOLDEN, "fakes", "botapi.py"), self.tg, g.TOKEN, g.OWNER], env=env,
                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=open(os.path.join(self.tg, "errors.log"), "w"))
         del env
@@ -174,7 +173,7 @@ class Raw(g.Drill):
             json.dump({"state": self.state, "model": os.path.join(HERE, "model"), "api": self.api}, f)
         os.makedirs(os.path.join(self.work, "src"))
         shutil.copytree(os.path.join(DATA, "ade-brain"), self.env["DRILL_TEMPLATE"], symlinks=True)
-        for n in NAMES: shutil.copytree(os.path.join(DATA, "repos", n), os.path.join(self.home, "Project", n), symlinks=True)
+        shutil.copytree(os.path.join(DATA, "repos", "website"), os.path.join(self.home, "Project", "website"), symlinks=True)
         self.readme = flow.readme_steps(open(os.path.join(DATA, "README.md")).read())
         self.sampling = True; self.samples = []
         threading.Thread(target=self.sample, daemon=True).start()
@@ -214,28 +213,30 @@ class Raw(g.Drill):
         return "%s, %d runs, %d prompts answered" % (self.readme["setup"], sum(1 for n, _ in self.shown if n.startswith("guide")), len(self.prompts))
 
     def spawn(self):
-        """outcome 3: one Telegram message, five focus agents, each in its own checkout, each reporting to the chat"""
+        """outcome 3: "build a website" from Telegram; the main agent assigns architect, frontend, backend and reviewer, in
+        order; each reports to the chat; Done only on the reviewer's green run"""
         before = len(self.sent()); t_msg = time.time(); self.phone(ASK)
         self.wait_for("the message to reach the main agent", lambda: ASK in self.claude_log(), 30)
-        ups = {}
-        def all_up():
-            for n in NAMES:
-                try: ups[n] = json.load(open(os.path.join(self.state, "up-%s.json" % n)))
+        def load(kind):
+            got = {}
+            for r in flow.ROLES:
+                try: got[r] = json.load(open(os.path.join(self.state, "%s-%s.json" % (kind, r))))
                 except (OSError, ValueError): pass
-            return all(n in ups and "saw" in ups[n] for n in NAMES)
-        def replies(): return [m.get("text", "") for m in self.sent()[before:] if m.get("method") == "sendMessage"]
-        try: self.wait_for("five focus agents up", all_up, 240)
+            return got
+        def texts(): return [(m.get("t", 0), m.get("text", "")) for m in self.sent()[before:] if m.get("method") == "sendMessage"]
+        def finished(): return any(x.startswith(("Done:", "Not done:")) for _, x in texts())
+        try: self.wait_for("the main agent's Done or Not done", finished, 600)
         except Failed: pass
-        try: self.wait_for("a report from each agent on the phone", lambda: all(any("[%s]" % n in r for r in replies()) for n in NAMES), 60)
+        try: self.wait_for("a report from each role on the phone", lambda: all(any(re.search(r'note: "?%s: ' % r, x) for _, x in texts()) for r in flow.ROLES), 30)
         except Failed: pass
-        self.sampling = False; self.peaks = flow.peak(self.samples)
-        for l in self.claude_log().split("\n"):
-            for tool, how, ln in flow.missing_tools("spawn", l): self.missing.append([tool, how, ln, "spawn", None])
-        self.spawned = flow.spawn_summary(NAMES, ups, [(0, r) for r in replies()], self.home, t_msg)
-        self.spawned["phone"] = replies()
-        need(self.spawned["ok"], "; ".join(self.spawned["problems"]) + "; the phone shows: " + " | ".join(r[:120] for r in replies()[-4:]))
-        return "all five up %.1f s after the message, each in its own checkout, each reported; peak %.0f MB, %d processes" % (
-            self.spawned["all_up"], self.peaks[0] / 1024.0, self.peaks[1])
+        for tool, how, ln in flow.missing_tools("spawn", "\n".join(open(os.path.join(self.state, "claude.log"), errors="replace").read().split("\n")[-400:])):
+            self.missing.append([tool, how, ln, "spawn", None])
+        done = next(((t, x) for t, x in texts() if x.startswith("Done:")), None)
+        self.spawned = flow.team_summary(load("assign"), load("done"), texts(), t_msg, done)
+        self.spawned["phone"] = [x for _, x in texts()]
+        need(self.spawned["ok"], "; ".join(self.spawned["problems"]) + "; the phone shows: " + " | ".join(x[:160] for x in self.spawned["phone"][-6:]))
+        return "all four up %.1f s after the message, Done %.1f s after it on the reviewer's green run; frontend and backend together: %s; peak %.0f MB, %d processes" % (
+            self.spawned["all_up"], self.spawned["done_after"], "yes" if self.spawned["parallel"] else "no", self.peaks[0] / 1024.0, self.peaks[1])
 
     def no_leak(self):
         got = super().no_leak()
@@ -311,7 +312,7 @@ STEPS = [
     ("guide: ade setup, from nothing to the end", "guide"),
     ("outcome 1: Claude Code installed and signed in", "check_claude"),
     ("outcome 2: Telegram connected, locked to the person, auto mode", "check_telegram"),
-    ("outcome 3: five focus agents from one Telegram message", "spawn"),
+    ("outcome 3: build a website, four roles from one Telegram message", "spawn"),
     ("safety: no guarded tool, no token shown", "no_leak"),
 ]
 

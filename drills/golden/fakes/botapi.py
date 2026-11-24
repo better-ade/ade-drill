@@ -139,7 +139,7 @@ class H(BaseHTTPRequestHandler):
                 if off: UPDATES[:] = [u for u in UPDATES if u["update_id"] >= off]
                 while not UPDATES and time.time() < end: LOCK.wait(end - time.time())
                 return self.reply(200, {"ok": True, "result": list(UPDATES)})
-        row = {"method": method, "chat_id": str(p.get("chat_id", ""))}
+        row = {"method": method, "chat_id": str(p.get("chat_id", "")), "t": time.time()}
         if method == "sendMessage":
             row["text"] = str(p.get("text", ""))
             if "reply_markup" in p: row["buttons"] = True

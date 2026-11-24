@@ -1,5 +1,5 @@
 """The raw-Ubuntu drill's own logic (story D4): the README's steps, what the screens say is missing, the person's fixes,
-the answers, the phases of the prompts, sudo per step, the five agents, and the report. No I/O here: run.py does that.
+the answers, the phases of the prompts, sudo per step, the team of four roles, and the report. No I/O here: run.py does that.
 """
 import calendar, re, time
 
@@ -162,23 +162,46 @@ def sudo_per_step(entries, windows):
     return rows
 
 
-# ---- the five agents ----
-def spawn_summary(names, ups, reports, home, t_msg):
-    """ups: {name: {"t", "cwd", "saw"}} (each agent's own record); reports: [(t, text)] sent to the chat; t_msg: when the
-    person's message went. {"ok", "all_up" (s from the message to the fifth up, or None), "problems", "rows"}"""
-    problems = []; rows = []
-    cwds = [u["cwd"] for u in ups.values()]
-    for n in names:
-        u = ups.get(n)
-        rep = next((txt for t, txt in reports if "[%s]" % n in txt), None)
-        if not u: problems.append("%s never started" % n); rows.append((n, None, "", 0, rep or "")); continue
-        if u["cwd"].rstrip("/") != "%s/Project/%s" % (home, n): problems.append("%s runs in %s, not its own checkout" % (n, u["cwd"]))
-        elif cwds.count(u["cwd"]) > 1: problems.append("%s shares its folder with another agent" % n)
-        if u.get("saw", 0) < len(names): problems.append("%s saw %d of %d running together: an agent waited for another" % (n, u.get("saw", 0), len(names)))
-        if rep is None: problems.append("%s: no report reached the chat" % n)
-        rows.append((n, u["t"] - t_msg, u["cwd"], u.get("saw", 0), rep or ""))
-    all_up = max(u["t"] for u in ups.values()) - t_msg if len(ups) == len(names) and all(n in ups for n in names) else None
-    return {"ok": not problems, "all_up": all_up, "problems": problems, "rows": rows}
+# ---- the team: "build a website", four roles ----
+ROLES = ["architect", "frontend", "backend", "reviewer"]
+
+
+def team_summary(assigns, dones, reports, t_msg, done):
+    """assigns: {role: {"t", "hub_role", "persona", "source"}} (the main agent's record of each assignment); dones: {role:
+    {"t_up", "t_done", "cwd", "persona" (the role file's first line, "" when missing), "result", "text"}} (each session's
+    own record); reports: [(t, text)] sent to the chat; done: (t, text) of the main agent's Done line, or None.
+    {"ok", "all_up", "done_after", "parallel", "problems", "findings", "rows"}"""
+    problems, findings, rows = [], [], []
+    for r in ROLES:
+        a, d = assigns.get(r) or {}, dones.get(r) or {}
+        rep = next((txt for t, txt in reports if re.search(r'note: "?%s: ' % r, txt)), None)
+        if not a: problems.append("%s was never assigned" % r)
+        elif a.get("hub_role") and a["hub_role"] != r:
+            findings.append("the hub has no %s role (bin/roles): assigned as %s with %s" % (r, a["hub_role"], a.get("persona")))
+        if a and not d.get("persona") and "t_up" in d:
+            problems.append("%s: no role file %s (%s)" % (r, a.get("persona"), a.get("source")))
+        if "t_up" not in d: problems.append("%s never started" % r)
+        elif "t_done" not in d: problems.append("%s never finished" % r)
+        if rep is None: problems.append("%s: no report reached the chat" % r)
+        rows.append((r, a.get("source", ""), a.get("hub_role", ""), d.get("persona", ""), d["t_up"] - t_msg if "t_up" in d else None,
+                     d["t_done"] - t_msg if "t_done" in d else None, d.get("cwd", ""), d.get("result", ""), rep or ""))
+    t = lambda r, k: (dones.get(r) or {}).get(k)
+    for r in ("frontend", "backend"):
+        if t(r, "t_up") is not None and (t("architect", "t_done") is None or t(r, "t_up") < t("architect", "t_done")):
+            problems.append("%s started before the architect's handoff" % r)
+    built = [t(r, "t_done") for r in ("frontend", "backend")]
+    if t("reviewer", "t_up") is not None and (None in built or t("reviewer", "t_up") < max(built)):
+        problems.append("the reviewer started before frontend and backend were done")
+    green = t("reviewer", "result") == "green"
+    if "t_done" in (dones.get("reviewer") or {}) and not green: problems.append("the reviewer's run is %s" % (t("reviewer", "result") or "unknown"))
+    if done and (not green or done[0] < (t("reviewer", "t_done") or float("inf"))): problems.append("Done was sent without the reviewer's green run")
+    if green and not done: problems.append("no Done reached the chat after the reviewer's green run")
+    ups = [t(r, "t_up") for r in ROLES]
+    parallel = None not in (t("frontend", "t_up"), t("backend", "t_up"), t("frontend", "t_done"), t("backend", "t_done")) and \
+        t("frontend", "t_up") < t("backend", "t_done") and t("backend", "t_up") < t("frontend", "t_done")
+    return {"ok": not problems, "all_up": max(ups) - t_msg if None not in ups else None,
+            "done_after": done[0] - t_msg if done and not problems else None, "parallel": parallel,
+            "problems": problems, "findings": findings, "rows": rows}
 
 
 def peak(samples):
@@ -205,7 +228,7 @@ def report(target, version, steps, screens, prompts, missing, fixes, sudo, spawn
          "| Prompts answered at a terminal | %d |" % len(prompts),
          "| Terminal-only prompts after Telegram | %d |" % len(after),
          "| sudo uses | %d |" % len(sudo),
-         "| Five focus agents | %s |" % ("all up in %.1f s, each in its own checkout, each reported" % spawn["all_up"] if spawn and spawn.get("ok") else "no: " + cell("; ".join((spawn or {}).get("problems") or ["not reached"]), 200)),
+         "| Build a website, four roles | %s |" % ("all four up in %.1f s, Done %.1f s after the message, on the reviewer's green run" % (spawn["all_up"], spawn["done_after"]) if spawn and spawn.get("ok") else "no: " + cell("; ".join((spawn or {}).get("problems") or ["not reached"]), 200)),
          "| Peak memory of the person's processes | %.0f MB |" % (peaks[0] / 1024.0),
          "| Peak process count | %d |" % peaks[1], ""]
     L += ["## Steps and their time", "", "| Step | Seconds | State | Detail |", "|---|---|---|---|"]
@@ -228,11 +251,19 @@ def report(target, version, steps, screens, prompts, missing, fixes, sudo, spawn
     L += ["", "## sudo", "", "| Step | Command |", "|---|---|"]
     for step, cmd in sudo: L.append("| %s | `%s` |" % (step, cell(cmd, 200)))
     if not sudo: L.append("| none | |")
-    L += ["", "## Five focus agents from Telegram", ""]
+    L += ["", "## Build a website: four roles from one Telegram message", "",
+          "The main agent (the hub's Telegram session, the coordinator, counted apart from the four) assigns each role with",
+          "the hub's own start (`ade work --role`), in order: architect; then frontend and backend; then the reviewer, whose",
+          "green run of the architect's verification command is the only way to Done. Role files: `ade init` (ade-method) and",
+          "`ade agent add` (ade-agent-registry).", ""]
     if spawn:
-        L += ["| Agent | Up after (s) | Folder | Saw running together | Its report on the phone |", "|---|---|---|---|---|"]
-        for n, t, cwd, saw, rep in spawn["rows"]: L.append("| %s | %s | %s | %s | %s |" % (n, "" if t is None else "%.1f" % t, cwd, saw, cell(rep)))
-        L += [""] + ["- " + p for p in spawn["problems"]]
+        L += ["| Role | From | Hub role | Role file | Up after (s) | Done after (s) | Folder | Result | Its report on the phone |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for r, src, hub, persona, up, dn, cwd, res, rep in spawn["rows"]:
+            L.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (r, src, hub, cell(persona or "missing", 40), "" if up is None else "%.1f" % up,
+                                                              "" if dn is None else "%.1f" % dn, cwd, res, cell(rep)))
+        L += ["", "Frontend and backend ran at the same time: %s." % ("yes" if spawn.get("parallel") else "no"), ""]
+        L += ["- finding: " + f for f in spawn.get("findings", [])] + ["- " + p for p in spawn["problems"]]
     else: L.append("Not reached.")
     L += ["", "## Screens", "", "| Screen | Seconds | Lines |", "|---|---|---|"]
     for n, t, sec in screens: L.append("| %s | %s | %d |" % (n, "" if sec is None else "%.1f" % sec, len(t.strip("\n").split("\n"))))

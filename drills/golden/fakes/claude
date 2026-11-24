@@ -178,7 +178,8 @@ def main():
     if prompt and MODEL:
         say("> " + prompt)
         with open(os.path.join(STATE, "focus-prompt.txt"), "w") as f: f.write(prompt + "\n")
-        p = subprocess.Popen(["bash", os.path.join(MODEL, "builder.sh")], cwd=os.getcwd(), env=agent_env(),
+        env = agent_env(); env["DRILL_PROMPT"] = prompt   # the session's first message, for the scripted model
+        p = subprocess.Popen(["bash", os.path.join(MODEL, "builder.sh")], cwd=os.getcwd(), env=env,
                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         for line in p.stdout: say(line.rstrip("\n"))
         p.wait()
