@@ -8,9 +8,16 @@
 # main), GOLDEN_OUT (report.md and transcripts/; default drills/raw/out), RAW_CACHE (the drill's Python, kept between
 # runs). With ADE_DRILL_TELEGRAM_TOKEN and ADE_DRILL_TELEGRAM_CHAT set, what the bot sends also goes to that real chat;
 # they reach the container by name only (docker exec -e NAME), never on a command line. Needs Docker and the network.
+#   RAW_RECORD=1 RAW_TARGET=desktop bash drills/raw-ubuntu.sh   also the run as a video: <GOLDEN_OUT>/video/ade-d4.mp4 and
+#   its poster ade-d4.png (drills/raw/record.sh: needs ffmpeg and a monospace font on this machine; never with the real bot)
 set -u; here="$(cd "$(dirname "$0")" && pwd)"; repo="$(dirname "$here")"
 target="${RAW_TARGET:-server}"
 case "$target" in server|desktop) ;; *) echo "DRILL FAIL: RAW_TARGET is server or desktop" >&2; exit 1 ;; esac
+record="${RAW_RECORD:-}"
+if [ "$record" = 1 ]; then
+  [ "$target" = desktop ] || { echo "DRILL FAIL: RAW_RECORD=1 records the desktop target only" >&2; exit 1; }
+  [ -z "${ADE_DRILL_TELEGRAM_TOKEN:-}${ADE_DRILL_TELEGRAM_CHAT:-}" ] || { echo "DRILL FAIL: RAW_RECORD=1 never runs with the real bot" >&2; exit 1; }
+fi
 command -v docker >/dev/null 2>&1 || { echo "DRILL FAIL: the raw-ubuntu drill needs Docker" >&2; exit 1; }
 out="${GOLDEN_OUT:-$here/raw/out}"; mkdir -p "$out" && chmod 777 "$out" || exit 1
 cache="${RAW_CACHE:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ade-raw-cache}"; mkdir -p "$cache" || exit 1
@@ -61,5 +68,8 @@ trap 'docker rm -f "$name" >/dev/null 2>&1; rm -rf "$data"' EXIT
 display=()
 if [ "$target" = desktop ]; then docker exec -d "$name" Xvfb :99 -screen 0 1280x800x24 -nolisten tcp || exit 1; display=(-e DISPLAY=:99); fi
 docker exec -u you -w /home/you -e HOME=/home/you -e USER=you -e RAW_TARGET="$target" -e GOLDEN_ADE_REF="${GOLDEN_ADE_REF:-}" \
-  -e GOLDEN_OUT=/out -e RAW_DATA=/drill-data -e ADE_DRILL_TELEGRAM_TOKEN -e ADE_DRILL_TELEGRAM_CHAT "${display[@]}" \
+  -e GOLDEN_OUT=/out -e RAW_DATA=/drill-data -e RAW_RECORD="$record" -e ADE_DRILL_TELEGRAM_TOKEN -e ADE_DRILL_TELEGRAM_CHAT "${display[@]}" \
   "$name" /opt/drill/python/bin/python3 -I /drill/drills/raw/run.py
+rc=$?
+if [ "$record" = 1 ]; then RAW_CACHE="$cache" bash "$here/raw/record.sh" "$out/video" || rc=1; fi
+exit $rc

@@ -56,7 +56,9 @@ JS
   reviewer) cmd="$(sed -n '/^## Verification command/,$p' docs/architecture.md 2>/dev/null | sed -n 's/^`\(.*\)`$/\1/p' | head -1)"
     if [ -z "$cmd" ]; then result=red; text="reviewer: red: docs/architecture.md names no verification command"
     elif out="$(if command -v timeout >/dev/null; then timeout 60 bash -c "$cmd"; else bash -c "$cmd"; fi 2>&1)"; then result=green; text="reviewer: green: $cmd passed"
-    else result=red; text="reviewer: red: $cmd: $(printf '%s' "$out" | tail -1)"; fi ;;
+    else result=red; text="reviewer: red: $cmd: $(printf '%s' "$out" | tail -1)"; fi
+    # the run itself (the command, then its output), for the recording's Review stage
+    [ -z "$cmd" ] || { printf '%s\n' "$cmd"; printf '%s\n' "$out" | tail -20; } > "$st/reviewer-run.txt" ;;
   *) result=red; text="$role: not a role this drill scripts" ;;
 esac
 echo "builder: $text"
