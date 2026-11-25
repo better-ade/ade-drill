@@ -5,7 +5,7 @@ the drill checks **everything together, at main, every night, against the real t
 
 | Part | What runs |
 |---|---|
-| **Suites** | every repo's verification command at `main`, on the runners in `drills/matrix.json` (macOS and Ubuntu) |
+| **Suites** | the verification command at `main` of each repo in `drills/matrix.json` (ade-method, ade-agent-registry, ade-cli, ade-secrets, ade-brain, ade-skills), on the runners it names (macOS and Ubuntu) |
 | **Drills** | cross-repo checks with real network and no fakes: `pins` (every version one repo pins in another still exists), `project` (install `ade` from main, `ade init` and `ade agent add` against the real ade-method and registry) |
 | **Golden path** | `golden`: the owner's one path end to end (install, the guide, hub saved to GitHub, Telegram locked and in auto mode, `ade project add`, "fix X" on Telegram, a focus agent's fix, the reviewer's tests, "Done" and a picture on the phone) with the real `ade` and hub template and a **stand-in for every account** (Claude, GitHub, Telegram); it records every screen and writes the first-run report |
 | **Report** | a failing night opens or updates one issue labelled `nightly`; the next green night closes it |
@@ -37,3 +37,10 @@ and nightly, and uploads the transcripts and the report. Once per release, with 
 
 Add a suite or a drill: one entry in `drills/matrix.json` (and `drills/<name>.sh` printing `ok` as its last line).
 Planned drills are in `docs/stories/`.
+
+Where it fits: the drill tests the rest of ADE together: [ade](https://github.com/better-ade/ade-cli), the command;
+[ade-brain](https://github.com/better-ade/ade-brain), the hub; [ade-method](https://github.com/better-ade/ade-method),
+the rules; [ade-skills](https://github.com/better-ade/ade-skills), the skills;
+[ade-secrets](https://github.com/better-ade/ade-secrets), the keys; [ade-terminal](https://github.com/better-ade/ade-terminal),
+the desktop app; and [ade-computer](https://github.com/better-ade/ade-computer), where `GOLDEN_TARGET=computer` runs.
+More at [ade.ardata.tech](https://ade.ardata.tech/).
