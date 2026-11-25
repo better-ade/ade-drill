@@ -12,4 +12,11 @@ else
     sudo mv gitleaks /usr/local/bin/; }
 fi
 npx -y playwright install chromium
+# a freshly downloaded Chromium's first start on a Mac runner is slow (the system checks the new app), long enough to
+# use up ade shot's whole time limit; start it once here so the drill's shot meets a browser that has run before
+if [ "$(uname -s)" = Darwin ]; then
+  exe="$(find "$HOME/Library/Caches/ms-playwright" -path '*chromium-*' -type f -perm -u+x -name 'Google Chrome for Testing' | sort | tail -1)"
+  [ -n "$exe" ] && { s=$(date +%s); perl -e 'alarm 180; exec @ARGV' "$exe" --headless --disable-gpu --no-first-run --dump-dom about:blank >/dev/null 2>&1 || true
+    echo "chromium first start: $(( $(date +%s) - s )) s"; }
+fi
 tmux -V; gitleaks version
