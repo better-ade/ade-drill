@@ -21,6 +21,16 @@ python3 tests/test_video.py 2>&1 | tail -4 | grep -q '^OK' || { echo "FAIL tests
 grep -q 'target: desktop, ade: main, record: "1"' .github/workflows/ci.yml && grep -q 'RAW_RECORD: ${{ matrix.record }}' .github/workflows/ci.yml &&
   grep -q 'name: ade-d4-video' .github/workflows/ci.yml && ! grep -q 'target: server.*record' .github/workflows/ci.yml ||
   { echo "FAIL CI does not record the desktop job (and only it) or does not upload the video"; rc=1; }
+# the ade ui tour video (story D5): its parts parse, its logic passes, and CI runs it by hand only (a dispatch)
+for f in drills/ui-tour/*.py drills/ui-tour/model/*.sh drills/ui-tour/fakes/* drills/ui-tour/fixture/api/tests/run.sh; do
+  case "$f" in *.py) python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' "$f" ;; *) bash -n "$f" ;; esac || { echo "FAIL syntax $f"; rc=1; }
+  case "$f" in *.py) ;; *) [ -x "$f" ] || { echo "FAIL not executable $f"; rc=1; } ;; esac
+done
+! command -v node > /dev/null || node --check drills/ui-tour/shot.cjs || { echo "FAIL syntax drills/ui-tour/shot.cjs"; rc=1; }
+python3 tests/test_ui_tour.py 2>&1 | tail -4 | grep -q '^OK' || { echo "FAIL tests/test_ui_tour.py"; python3 tests/test_ui_tour.py 2>&1 | tail -20; rc=1; }
+grep -q 'bash drills/ui-tour.sh' .github/workflows/ci.yml && grep -q 'name: ade-ui-tour' .github/workflows/ci.yml &&
+  grep -q "if: github.event_name == 'workflow_dispatch'" .github/workflows/ci.yml ||
+  { echo "FAIL CI does not run the ui-tour drill by hand only, or does not upload its video"; rc=1; }
 # the golden-path drill's own parts (story D3); the drill itself needs the network and runs in CI's golden job
 python3 tests/test_golden.py 2>&1 | tail -4 | grep -q '^OK' || { echo "FAIL tests/test_golden.py"; python3 tests/test_golden.py 2>&1 | tail -20; rc=1; }
 grep -q 'drills/golden.sh' .github/workflows/ci.yml && grep -q 'upload-artifact@' .github/workflows/ci.yml && grep -q 'ade-cli-release' .github/workflows/nightly.yml ||
