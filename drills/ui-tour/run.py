@@ -155,7 +155,7 @@ class Run:
         if not self.shot:
             m = re.search(r"code[^0-9A-Za-z\n]{1,20}([0-9]{4,8}|[A-Za-z0-9]{3,6}-[A-Za-z0-9]{3,6})", self.screen.text())
             self.shot = subprocess.Popen(["node", os.path.join(HERE, "shot.cjs"), open(url).read().strip(), os.path.join(self.out, "docs-page.png"),
-                                          os.path.join(self.work, "docs-page.txt")] + ([m.group(1)] if m else []),
+                                          os.path.join(self.work, "docs-page.txt"), os.path.join(self.work, "docs-page.html")] + ([m.group(1)] if m else []),
                                          env=self.env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return True
 
@@ -166,18 +166,28 @@ class Run:
         need(rc == 0, "the Docs page could not be drawn (shot.cjs: exit %d): %s" % (rc, out.strip()[-300:]))
         g = os.path.join(self.work, "guard.log")
         need(not os.path.exists(g), "a guarded tool was called: " + (open(g).read().strip().split("\n")[0] if os.path.exists(g) else ""))
-        subs = [("/private" + self.home, "~"), (self.home, "~"), ("/private" + self.work, "<drill>"), (self.work, "<drill>"), (self.sock, "ade")]
-        me = pwd.getpwuid(os.getuid()).pw_name; host = socket.gethostname().split(".")[0]
-        known = tuple(k for k in (me, host, os.path.basename(self.work)) if k and k not in ("localhost", "you", "root"))
-        page = open(os.path.join(self.work, "docs-page.txt")).read()
-        bad = tour.scan(tour.redact(page), known)
-        need(not bad, "the Docs page picture would show %s" % ", ".join(bad))
+        subs, known = self.names()
+        self.check_page(known)
         cast, facts = tour.build(rec, self.raw, self.marks, subs=subs, known=known)
         with open(os.path.join(self.out, tour.NAME + ".cast"), "w") as f: f.write(cast)
         with open(os.path.join(self.out, tour.NAME + ".vtt"), "w") as f: f.write(tour.vtt())
         with open(os.path.join(self.out, tour.NAME + ".json"), "w") as f:
             json.dump(tour.manifest(os.environ.get("ADE_UI_TOUR_REF", ""), facts, self.versions), f, indent=1, ensure_ascii=False)
         return facts
+
+    def check_page(self, known):
+        """the Docs page as Chromium drew it (its text, and its HTML: alt, title and links count) holds nothing that must
+        never show: scanned raw, never redacted first, since the picture of it is not redacted. TourFailed names the kind."""
+        page = "".join(open(os.path.join(self.work, f), errors="replace").read() + "\n" for f in ("docs-page.txt", "docs-page.html"))
+        bad = tour.scan(page, known)
+        if any(p and p in page for p in (self.home, self.work, os.path.basename(self.work))): bad.append("the drill's folder")
+        need(not bad, "the Docs page picture would show %s" % ", ".join(bad))
+
+    def names(self):
+        """(subs, known): the drill's folders put away, and this machine's names, for the cast and the failure screen"""
+        subs = [("/private" + self.home, "~"), (self.home, "~"), ("/private" + self.work, "<drill>"), (self.work, "<drill>"), (self.sock, "ade")]
+        me = pwd.getpwuid(os.getuid()).pw_name; host = socket.gethostname().split(".")[0]
+        return subs, tuple(k for k in (me, host, os.path.basename(self.work)) if k and k not in ("localhost", "you", "root"))
 
     def cleanup(self):
         if self.pid:
@@ -201,7 +211,9 @@ def main(argv):
         return 0
     except (tour.TourFailed, ValueError, subprocess.SubprocessError, OSError) as e:
         print("UI TOUR FAIL: %s" % e, file=sys.stderr)
-        with open(os.path.join(out, "screen.txt"), "w") as f: f.write(tour.redact(r.screen.text()))
+        subs, known = r.names(); text = r.screen.text()
+        for a, b in subs: text = text.replace(a, b)
+        with open(os.path.join(out, "screen.txt"), "w") as f: f.write(tour.redact(text, known))
         return 1
     finally:
         r.cleanup()

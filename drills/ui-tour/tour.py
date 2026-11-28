@@ -27,7 +27,8 @@ WIDTH, HEIGHT = 1280, 720     # the video
 LAST_FRAME = 3.0              # agg keeps the last frame this long (drills/raw/record.sh: --last-frame-duration 3)
 POINTER_HOLD = 0.8            # the pointer stays this long after a click; then the client is redrawn without it
 PREFIX = "\x02"               # tmux's prefix, C-b
-TOLERANCE = 0.5               # two runs' timings may differ this much
+TOLERANCE = 0.5
+MEASURED_TOLERANCE = 2.0   # how long each step really took ("measured"): a slower machine changes it               # two runs' timings may differ this much
 NAME = "ade-ui-tour"
 CAPTION = "Claude, its sign-in and the agents' work are stand-ins in this tour; ade ui, tmux and every click are real"
 
@@ -396,17 +397,22 @@ def limits(p):
     return bad
 
 
-def same(a, b, tol=TOLERANCE):
-    """what differs between two runs' json beyond the tolerance (nothing: [])"""
+def same(a, b, tol=TOLERANCE, mtol=MEASURED_TOLERANCE):
+    """what differs between two runs' json (nothing: []). The video timings (each step's from/to, the clicks, the browser)
+    are planned and held to tol (0.5 s); "measured", how long each step really took, is held to mtol (2 s)."""
     if len(a["steps"]) != len(b["steps"]): return ["the runs have %d steps and %d steps" % (len(a["steps"]), len(b["steps"]))]
     bad = []
     for x, y in zip(a["steps"], b["steps"]):
         if x["caption"] != y["caption"]: bad.append("step %d: the caption differs" % x["n"])
         if abs(x["from"] - y["from"]) > tol or abs(x["to"] - y["to"]) > tol:
-            bad.append("step %d: %.2f-%.2f s and %.2f-%.2f s" % (x["n"], x["from"], x["to"], y["from"], y["to"]))
+            bad.append("step %d: %.2f-%.2f s and %.2f-%.2f s in the video" % (x["n"], x["from"], x["to"], y["from"], y["to"]))
     if len(a["clicks"]) != len(b["clicks"]): bad.append("click count: %d and %d" % (len(a["clicks"]), len(b["clicks"])))
     for i, (x, y) in enumerate(zip(a["clicks"], b["clicks"]), 1):
         if x[1] != y[1] or abs(x[0] - y[0]) > tol: bad.append("click %d: %s at %.2f s and %s at %.2f s" % (i, x[1], x[0], y[1], y[0]))
+    ma, mb = a.get("measured", []), b.get("measured", [])
+    if len(ma) != len(mb): bad.append("measured: %d steps and %d steps" % (len(ma), len(mb)))
+    for i, (x, y) in enumerate(zip(ma, mb), 1):
+        if abs(x - y) > mtol: bad.append("step %d took %.1f s and %.1f s (measured)" % (i, x, y))
     oa, ob = a.get("overlay"), b.get("overlay")
     if (oa is None) != (ob is None) or (oa and any(abs(p - q) > tol for p, q in zip(oa, ob))): bad.append("the browser: %s and %s" % (oa, ob))
     return bad

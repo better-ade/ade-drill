@@ -199,6 +199,7 @@ class TourVideo(unittest.TestCase):
             got = tour.limits(bad); self.assertEqual(len(got), 1, got); self.assertIn(word, got[0])
 
     def test_tour_video_rendered_by_the_d4_recorder_at_1280x720_with_the_browser_on_top(self):
+        # the arguments only (fake agg, ffmpeg, ffprobe); the real encode is checked by `tour.py check` in the by-hand drill
         with tempfile.TemporaryDirectory() as d:
             fakes = os.path.join(d, "fakes"); os.makedirs(fakes); log = os.path.join(d, "ffmpeg.log")
             def tool(name, body):
@@ -277,6 +278,26 @@ class TourHonest(unittest.TestCase):
         self.assertNotIn("adt.x1", cast); self.assertIn("~/hubs/tour/projects/api", cast)
 
 
+    def test_tour_honest_the_docs_page_is_scanned_as_drawn_and_refused_naming_the_kind(self):
+        import importlib.util   # drills/raw has a run.py too: this one by its path
+        spec = importlib.util.spec_from_file_location("ui_tour_run", os.path.join(ROOT, "drills", "ui-tour", "run.py"))
+        run = importlib.util.module_from_spec(spec); spec.loader.exec_module(run)
+        with tempfile.TemporaryDirectory() as d:
+            r = run.Run.__new__(run.Run); r.work = os.path.join(d, "adt.q7"); r.home = os.path.join(r.work, "h"); os.makedirs(r.home)
+            def page(text, html="<html><body>ok</body></html>"):
+                open(os.path.join(r.work, "docs-page.txt"), "w").write(text); open(os.path.join(r.work, "docs-page.html"), "w").write(html)
+            page("PRD: team invoices ~/hubs/tour/projects/docs"); r.check_page(("someone",))      # nothing to find
+            for text, html, kind in (
+                    ("in /home/someone/hubs", "", "home path"), ("made by someone", "", "user name"),
+                    ("mail owner@example.invalid", "", "email"), ("token " + TOKEN, "", "token"),
+                    ("ok", '<img alt="owner@example.invalid">', "email"),                          # the page's HTML counts too
+                    ("ok", '<a href="file://%s/hubs/tour">x</a>' % os.path.join(d, "adt.q7", "h"), "the drill's folder"),
+                    ("from adt.q7", "", "the drill's folder")):
+                page(text, html or "<html></html>")
+                with self.assertRaises(tour.TourFailed) as e: r.check_page(("someone",))
+                self.assertIn(kind, str(e.exception))
+
+
 class TourRepeatable(unittest.TestCase):
     def test_tour_repeatable_real_times_are_fitted_to_the_planned_ones(self):
         anchors = [(0.6, 1.0), (4.0, 2.0)]
@@ -294,6 +315,14 @@ class TourRepeatable(unittest.TestCase):
         b = tour.manifest("v9.9.9", tour.build(*fake_record(2.5))[1], {})
         self.assertEqual(tour.same(a, b), [])
         for (x, _), (y, _) in zip(a["clicks"], b["clicks"]): self.assertLessEqual(abs(x - y), 0.5)
+
+    def test_tour_repeatable_the_real_step_times_agree_within_2_s(self):
+        # the video timings (steps' from/to, clicks, the browser) are planned and held to 0.5 s; "measured" is how long each
+        # step really took, which a slower machine changes, so it is held to 2 s
+        a = tour.manifest("v9.9.9", tour.build(*fake_record())[1], {})
+        b = json.loads(json.dumps(a)); b["measured"][3] += 1.5; self.assertEqual(tour.same(a, b), [])
+        b["measured"][3] += 1.0; got = " ".join(tour.same(a, b)); self.assertIn("step 4", got); self.assertIn("measured", got)
+        b = json.loads(json.dumps(a)); b["measured"].pop(); self.assertIn("measured", " ".join(tour.same(a, b)))
 
     def test_tour_repeatable_a_difference_is_named(self):
         a = tour.manifest("v9.9.9", tour.build(*fake_record())[1], {})

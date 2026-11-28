@@ -113,4 +113,4 @@ jobs:
             ${{ runner.temp }}/ui-tour/ade-ui-tour.png
             ${{ runner.temp }}/ui-tour/ade-ui-tour.vtt
             ${{ runner.temp }}/ui-tour/ade-ui-tour.json
-          if-no-files-found: error
+          if-no-files-found: warn   # a failed run keeps what it made; the run's own error says why
