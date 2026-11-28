@@ -16,7 +16,7 @@ while :; do
     what="$(cat "$cue")"; rm -f "$cue"
     case "$what" in
       busy) mark busy; say ""; say "Working on the invoice export: api/export.py, 3 files" ;;
-      waiting) mark waiting; say "Needs you: may I add the invoices table to the database? (y/n)" ;;
+      done) say "Done: the invoice export."; mark idle ;;
       write-prd) cat >> "$folder/_bmad-output/prd.md" <<'MD'
 
 ## Billing rules

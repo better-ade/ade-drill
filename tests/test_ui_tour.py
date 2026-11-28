@@ -9,7 +9,7 @@ import tour  # noqa: E402
 
 TOKEN = "123456789:" + "drill-stand-in-token-not-a-real-one_0"
 CAPTIONS = ["One terminal, all your agents.", "Start another agent with a click.",
-            "Each tab shows who is working and who needs you.", "Right click for everything a tab can do.",
+            "Each tab shows which agent is working and which is done.", "Right click for everything a tab can do.",
             "Your PRD, architecture and stories, newest first.", "Read the plan while it is written.",
             "Open it in the browser, diagrams and all.", "Done means the tests pass."]
 
@@ -56,7 +56,7 @@ class FakeDriver:
     def agent(self, name, what):
         self.agents.append((name, what))
         if what == "busy": self.appear("⟳|projects/api", 0.7)
-        if what == "waiting": self.appear("?|projects/api", 0.7)
+        if what == "done": self.appear("○|projects/api", 0.7)
         if what == "write-prd": self.appear("## Billing rules", 1.2)
         if what == "tests": self.appear("Done. Tests pass.", 1.5)
 
@@ -106,7 +106,7 @@ class TourRuns(unittest.TestCase):
     def test_tour_runs_the_steps_against_a_driver_in_order(self):
         d = FakeDriver(); rec = tour.Tour(d).run()
         self.assertEqual([s["n"] for s in rec["steps"]], list(range(1, 9)))
-        self.assertEqual(d.agents, [("api", "busy"), ("api", "waiting"), ("docs", "write-prd"), ("api", "tests")])
+        self.assertEqual(d.agents, [("api", "busy"), ("api", "done"), ("docs", "write-prd"), ("api", "tests")])
         clicks = [c for s in rec["steps"] for c in s["clicks"]]
         self.assertEqual([c[3] for c in clicks][:4], ["[+ agent]", "projects/billing", "builder", "projects/api"])
         self.assertTrue(any(x.startswith("\x1b[<2;") for _, x in d.sent), "a right click")
@@ -114,6 +114,33 @@ class TourRuns(unittest.TestCase):
             self.assertEqual([a[0] for a in s["anchors"]], [a[0] for a in plan["do"]])
             self.assertGreaterEqual(s["end"] - s["start"], plan["slot"] - 1e-6)
         self.assertEqual(len(d.refreshed), len(clicks))   # each pointer goes when the screen is redrawn
+
+    def test_step3_done_the_tab_goes_busy_then_done(self):
+        s3 = tour.STEPS[2]
+        self.assertEqual([a[1:] for a in s3["do"]], [("click", "projects/api", "bar"), ("agent", "api", "busy"),
+                                                     ("state", "projects/api", "⟳"), ("agent", "api", "done"),
+                                                     ("state", "projects/api", "○")])
+        self.assertIn("busy ⟳, then done ○", s3["screen"])
+        for s in tour.STEPS:   # the ? state comes with ade-cli's U4: no step needs it
+            self.assertFalse([a for a in s["do"] if a[1] == "state" and a[3] == "?"], s["n"])
+            self.assertNotIn("waiting", [a[3] for a in s["do"] if a[1] == "agent"], s["n"])
+        sh = open(os.path.join(ROOT, "drills", "ui-tour", "model", "builder.sh")).read()
+        self.assertRegex(sh, r'(?m)^\s*done\) .*mark idle')
+        self.assertNotRegex(sh, r'(?m)^\s*waiting\)')
+        d = FakeDriver(never=("○|projects/api",))
+        with self.assertRaises(tour.TourFailed) as e: tour.Tour(d, timeout=5).run()
+        self.assertIn("step 3", str(e.exception)); self.assertIn("○", str(e.exception))
+
+    def test_step3_caption_in_the_captions_the_vtt_and_d5s_story(self):
+        new, old = "Each tab shows which agent is working and which is done.", "Each tab shows who is working and who needs you."
+        self.assertEqual(tour.STEPS[2]["caption"], new); self.assertIn("\n" + new + "\n", tour.vtt())
+        self.assertNotIn(old, tour.vtt())
+        story = open(os.path.join(ROOT, "docs", "stories", "D5-ade-ui-tour-video.md")).read()
+        row = [l for l in story.splitlines() if l.startswith("| 3 |")]
+        self.assertEqual(len(row), 1); self.assertIn('"%s"' % new, row[0]); self.assertIn("busy `⟳` → done `○`", row[0])
+        self.assertNotIn(old, story)
+        for i, s in enumerate(tour.STEPS):   # the other steps are unchanged
+            if i != 2: self.assertEqual(s["caption"], CAPTIONS[i])
 
     def test_tour_runs_fails_naming_the_step_and_what_never_came(self):
         d = FakeDriver(never=("## Billing rules",))

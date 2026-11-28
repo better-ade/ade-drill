@@ -15,7 +15,7 @@ About 45 seconds at 1280x720, in a hub with three stand-in focus agents (api, we
 |---|---|---|
 | 1 | `ade ui` opens: tabs main, api, web, docs; the button row | "One terminal, all your agents." |
 | 2 | `[+ agent]` → the new-agent menu → `billing` starts | "Start another agent with a click." |
-| 3 | A click on tab `api`; its state goes busy → `?` waiting | "Each tab shows who is working and who needs you." |
+| 3 | A click on tab `api`; its state goes busy `⟳` → done `○` | "Each tab shows which agent is working and which is done." |
 | 4 | Right click on `api` → its menu → preview its plan | "Right click for everything a tab can do." |
 | 5 | `prefix v` → the docs list → the PRD | "Your PRD, architecture and stories, newest first." |
 | 6 | The docs agent writes a section; the PRD redraws live | "Read the plan while it is written." |
