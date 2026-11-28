@@ -151,7 +151,7 @@ class TourRuns(unittest.TestCase):
         pins = open(os.path.join(ROOT, "drills", "pins.sh")).read()
         m = re.search(r'^ADE_UI_TOUR_REF="\$\{ADE_UI_TOUR_REF:-(v[0-9.]+)\}"(.*)$', pins, re.M)
         self.assertTrue(m, "drills/pins.sh names the ade-cli release the tour drives, overridable")
-        self.assertIn("PLACEHOLDER", m.group(2))   # the next release, not a tag yet: said where it is set
+        self.assertNotIn("PLACEHOLDER", m.group(2))   # a released tag now (v0.2.16, U5 and U6), checked by drills/pins.sh
         sh = os.path.join(ROOT, "drills", "ui-tour.sh")
         got = subprocess.run(["bash", sh, "--pin"], capture_output=True, text=True, env=dict(os.environ, ADE_UI_TOUR_REF=""))
         self.assertEqual(got.stdout.strip(), m.group(1))
