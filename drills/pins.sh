@@ -2,7 +2,7 @@
 # Drill: every version one repo pins in another still exists. Real network, no fakes.
 . "$(dirname "$0")/lib.sh"
 # The released ade-cli the ui-tour drill (story D5, drills/ui-tour.sh) drives: its one place. Override with ADE_UI_TOUR_REF.
-ADE_UI_TOUR_REF="${ADE_UI_TOUR_REF:-v0.2.16}"   # PLACEHOLDER: the next release (U5 and U6), not a tag yet; once it is, drop this word
+ADE_UI_TOUR_REF="${ADE_UI_TOUR_REF:-v0.2.16}"   # the release with U5 and U6
 cli="$(clone ade-cli)"; brain="$(clone ade-brain)"; method="$(clone ade-method)"
 pin_of() { sed -n "s/^$1=\"\${$1:-\([^}]*\)}\"\$/\1/p" "$cli/ade" | head -1; }
 m="$(pin_of ADE_METHOD_REF)"; r="$(pin_of ADE_REGISTRY_REF)"

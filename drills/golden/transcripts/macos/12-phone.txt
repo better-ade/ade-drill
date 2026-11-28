@@ -10,4 +10,5 @@ your bot: your chat now runs in auto mode: your bot is locked to you, so your ma
 another account: fix everything
 you: fix the failing test in calc: add() subtracts
 your bot: Done: fix the failing test in calc: add() subtracts (calc). The reviewer ran python3 -m unittest discover -s tests and it passes.
+your bot: [a picture] Done: calc, the tests pass
 your bot: [a picture]

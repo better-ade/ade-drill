@@ -1,0 +1,17 @@
+project calc: ~/Project/calc
+made projects/calc/CLAUDE.md
+made projects/calc/ACCESS.md
+made projects/calc/STATE.md
+made projects/calc/memory/MEMORY.md
+made projects/calc/.claude/settings.json
+made projects/calc/.mcp.json
+made .claude/agents/calc.md
+warning: age is not installed (bin/keys share and receive need it): sudo apt-get install age
+warning: docker is not installed (recommended, for isolated local tests): sudo apt-get install docker.io docker-compose-v2 && sudo systemctl enable --now docker
+  ACCESS.md: (no remote), ~/Project/calc, branch main
+  copy the ADE method into it (ade init; nothing is overwritten)? [y/N] n
+memory: README.md and docs/ indexed (bin/brain index)
+projects:
+  projects/calc        added    ~/Project/calc
+start focus agents on them now? [y/N] n
+start it later: ade work projects/calc

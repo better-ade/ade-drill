@@ -1,4 +1,4 @@
-Step 4 of 6: Your hub
+Step 4 of 7: Your hub
 Your hub is where ADE keeps its memory: a folder in ~/hubs, saved in a private
 repository on your GitHub. ADE sets it up, then you pick its agents.
 Name for your hub (lower-case letters, digits and -, e.g. acme-sre): drill-hub
@@ -21,10 +21,18 @@ The kind of teammate this hub's main agent acts as (pick the closest):
 Kind of teammate (1-13): 1
 Who this hub works for (a client or your team; shown in the hub): Drill
 Owner (your name, as it should appear in the hub): Drill Owner
+warning: age is not installed (bin/keys share and receive need it): sudo apt-get install age
+warning: docker is not installed (recommended, for isolated local tests): sudo apt-get install docker.io docker-compose-v2 && sudo systemctl enable --now docker
+warning: age is not installed (bin/keys share and receive need it): sudo apt-get install age
+warning: docker is not installed (recommended, for isolated local tests): sudo apt-get install docker.io docker-compose-v2 && sudo systemctl enable --now docker
+warning: age is not installed (bin/keys share and receive need it): sudo apt-get install age
+warning: docker is not installed (recommended, for isolated local tests): sudo apt-get install docker.io docker-compose-v2 && sudo systemctl enable --now docker
+warning: age is not installed (bin/keys share and receive need it): sudo apt-get install age
+warning: docker is not installed (recommended, for isolated local tests): sudo apt-get install docker.io docker-compose-v2 && sudo systemctl enable --now docker
 initialized drill-hub (Data Engineer for Drill) at /Users/you/hubs/drill-hub
-next: cd /Users/you/hubs/drill-hub && bin/setup && bin/brain index && bin/doctor, then start claude there
 Saving the hub's first version to your private GitHub repository (bin/sync):
 synced: <commit> sync <date> <time>
+hub.conf is not in the saved version (bin/sync leaves it out on purpose); to keep it in git by hand: cd ~/hubs/drill-hub && git add hub.conf && git commit -m "Add hub.conf" && git push
 default hub: ~/hubs/drill-hub
 Your everything agent (the orchestrator) is the one agent you talk to; it hands
 work to the others. Pick the AI service it uses (one; later: ade setup --top):

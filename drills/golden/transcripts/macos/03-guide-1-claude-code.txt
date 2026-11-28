@@ -1,4 +1,4 @@
-Step 1 of 6: Claude Code
+Step 1 of 7: Claude Code
 Claude Code is the agent ADE runs. This installs it with its official
 installer, after your yes.
 Claude Code is not installed. Install it now? This runs: curl -fsSL https://claude.ai/install.sh | bash [y/N] y
