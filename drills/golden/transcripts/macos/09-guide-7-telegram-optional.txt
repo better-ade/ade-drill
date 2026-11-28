@@ -1,4 +1,4 @@
-Step 6 of 6: Telegram (optional)
+Step 7 of 7: Telegram (optional)
 Optional: a Telegram bot of your own lets you reach your main agent. A yes asks
 for the bot's token (hidden), then goes one step at a time; no skips it.
 Do you want to reach your main agent from Telegram? [y/N] y

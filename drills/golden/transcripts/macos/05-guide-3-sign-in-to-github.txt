@@ -1,4 +1,4 @@
-Step 3 of 6: Sign in to GitHub
+Step 3 of 7: Sign in to GitHub
 Your hub needs GitHub: it is a private repository on your GitHub account,
 which keeps the hub's memory and lets you restore the hub on another computer.
 This runs GitHub's own sign-in (gh auth login --web): it shows a one-time code

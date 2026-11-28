@@ -1,0 +1,5 @@
+Step 5 of 7: Your tools (optional)
+Optional: the tools you use for this work. ade connects the ones it has a recipe
+for (you sign in yourself, here) and notes the rest by name only; Enter skips.
+skipped: the tool list could not be read; ade connect says why
+checked: no tools connected or noted yet
