@@ -1,5 +1,15 @@
 Step 5 of 7: Your tools (optional)
 Optional: the tools you use for this work. ade connects the ones it has a recipe
 for (you sign in yourself, here) and notes the rest by name only; Enter skips.
-skipped: the tool list could not be read; ade connect says why
+  1) clickup  ClickUp (tickets)
+  2) jira     Jira (tickets)
+  3) linear   Linear (tickets)
+  4) discord  Discord (chat), coming: noted, not connected yet
+  5) gmail    Gmail (mail), coming: noted, not connected yet
+  6) outlook  Outlook (mail), coming: noted, not connected yet
+  7) slack    Slack (chat), coming: noted, not connected yet
+  8) teams    Microsoft Teams (chat), coming: noted, not connected yet
+  9) other    another tool: you type its name
+Which tools do you use for this work? Pick any (numbers or names, spaces between; Enter skips):
+skipped: nothing picked; ade setup offers your tools again
 checked: no tools connected or noted yet
