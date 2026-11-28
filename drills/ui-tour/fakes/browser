@@ -1,0 +1,14 @@
+#!/bin/bash
+# A stand-in for the desktop browser (`open` on a Mac, `xdg-open` on Linux) in the ui-tour drill (story D5): it keeps
+# the local link ade opened ($DRILL_TOUR/browser.url), from the file ade hands it or from the link itself. The drill's
+# headless Chromium draws that page (shot.cjs); nothing else is opened.
+set -u
+python3 -I - "${1:-}" "${DRILL_TOUR:?}/browser.url" <<'PY'
+import html, os, re, sys
+arg, out = sys.argv[1], sys.argv[2]
+text = open(arg).read() if os.path.isfile(arg) else arg
+m = re.search(r"https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/[^\"'<> \s]*", text)
+if not m: sys.exit("browser stand-in: no local link in what ade opened")
+with open(out + ".part", "w") as f: f.write(html.unescape(m.group(0)) + "\n")
+os.replace(out + ".part", out)
+PY
